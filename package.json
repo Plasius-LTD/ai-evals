@@ -1,6 +1,6 @@
 {
   "name": "@plasius/ai-evals",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Golden datasets, scorecards, and cost-quality evaluation contracts for Plasius AI workloads.",
   "type": "module",
   "sideEffects": false,
