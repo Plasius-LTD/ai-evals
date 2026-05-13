@@ -7,13 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 ## [Unreleased]
 
 - **Added**
-  - (placeholder)
+  - Added `@plasius/ai-evals` scorecard and golden-dataset contracts for quality, cost, latency, confidence, cache-savings, and safety-regression evaluation under `ai.evals-scorecards.enabled`.
+- Added fixture-first scorecard execution primitives (`AiEvalFixtureAdapter`, `evaluateAiEvalScorecard`, `compareAiEvalScorecards`) and dataset validation helpers.
 
 - **Changed**
-  - (placeholder)
+  - Updated package feature flag contract from previous generic evaluator naming to `ai.evals-scorecards.enabled`.
 
 - **Fixed**
-  - (placeholder)
+  - No behavior regressions fixed in runtime dependencies; all evaluator contracts are now deterministic and testable with fixtures.
 
 - **Security**
   - (placeholder)
