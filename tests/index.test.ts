@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   AI_EVALS_FEATURE_FLAG_ID,
   AI_EVALS_PACKAGE,
+  AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID,
   AI_EVALS_SCORECARDS_ENABLED_ENV,
   AI_EVALS_SCORECARDS_FEATURE_FLAG_ID,
   AI_EVALS_ENV_PREFIX,
@@ -11,9 +12,13 @@ import {
   AiEvalGoldenDataset,
   defineAiEvalGoldenDataset,
   evaluateAiEvalScorecard,
+  evaluateQuietMeasureScorecard,
   compareAiEvalScorecards,
   isAiEvalsScorecardsEnabled,
   packageDescriptor,
+  QUIET_MEASURE_FIXTURE_CASES,
+  QUIET_MEASURE_GOLDEN_DATASET,
+  type QuietMeasureFixtureInput,
 } from "../src/index.js";
 
 describe("@plasius/ai-evals", () => {
@@ -222,5 +227,143 @@ describe("@plasius/ai-evals", () => {
     const latencyDelta = comparison.metricDeltas.find((d) => d.metricId === "latency");
     expect(latencyDelta?.delta).toBeDefined();
     expect(typeof latencyDelta?.candidateBetter).toBe("boolean");
+  });
+
+  it("publishes a Quiet Measure fixture pack with the expected archetype coverage", () => {
+    expect(AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID).toBe(
+      "isekai.player-system.quiet-measure.enabled",
+    );
+    expect(QUIET_MEASURE_GOLDEN_DATASET.datasetId).toBe(
+      "quiet-measure-classification-v1",
+    );
+    expect(QUIET_MEASURE_FIXTURE_CASES).toHaveLength(6);
+    expect(
+      QUIET_MEASURE_FIXTURE_CASES.map((fixture) => fixture.metadata?.expectedArchetype),
+    ).toEqual([
+      "heroic",
+      "villainous",
+      "counterfeit-hero",
+      "counterfeit-villain",
+      "tyrant",
+      "redeemed-character",
+    ]);
+    expect(
+      QUIET_MEASURE_FIXTURE_CASES.every(
+        (fixture) =>
+          typeof fixture.metadata?.boundaryNote === "string"
+          && fixture.metadata.boundaryNote.length > 0,
+      ),
+    ).toBe(true);
+  });
+
+  it("uses Quiet Measure scorecards to catch courtesy-dominant counterfeit-hero classifications", async () => {
+    const adapter: AiEvalFixtureAdapter<QuietMeasureFixtureInput> = {
+      adapterId: "courtesy-biased",
+      tier: "standard",
+      async runFixture(fixture) {
+        const { metadata, input } = fixture;
+        const courtesyBias = input.publicCourtesy === "dominant";
+        const expectedArchetype = metadata?.expectedArchetype;
+        const counterfeitPenalty =
+          expectedArchetype === "counterfeit-hero" && courtesyBias ? 0.38 : 0;
+
+        return {
+          fixtureId: fixture.fixtureId,
+          metrics: [
+            {
+              metricId: "quality",
+              value: Math.max(0.45, 0.92 - counterfeitPenalty),
+            },
+            { metricId: "cost", value: 0.8 },
+            { metricId: "latency", value: 240 },
+            {
+              metricId: "confidence",
+              value: Math.max(0.42, 0.82 - counterfeitPenalty / 2),
+            },
+            { metricId: "cacheSavings", value: 0.2 },
+            {
+              metricId: "safetyRegression",
+              value: expectedArchetype === "counterfeit-hero" ? 0.11 : 0.03,
+            },
+          ],
+        };
+      },
+    };
+
+    const scorecard = await evaluateQuietMeasureScorecard({
+      runId: "quiet-measure-courtesy-bias",
+      adapter,
+      featureEnabled: true,
+    });
+
+    expect(scorecard.status).toBe("failed");
+    const counterfeitHero = scorecard.fixtureResults.find(
+      (result) => result.fixtureId === "quiet-measure-counterfeit-hero",
+    );
+    expect(counterfeitHero?.passed).toBe(false);
+  });
+
+  it("shows virtue-compounding runs outperform vice-viable runs without collapsing darker paths", async () => {
+    const virtueAware: AiEvalFixtureAdapter<QuietMeasureFixtureInput> = {
+      adapterId: "virtue-aware",
+      tier: "premium",
+      async runFixture(fixture) {
+        const archetype = fixture.metadata?.expectedArchetype;
+        const virtueWeighted = archetype === "heroic" || archetype === "redeemed-character";
+
+        return {
+          fixtureId: fixture.fixtureId,
+          metrics: [
+            { metricId: "quality", value: virtueWeighted ? 0.97 : 0.87 },
+            { metricId: "cost", value: virtueWeighted ? 1.2 : 1.1 },
+            { metricId: "latency", value: virtueWeighted ? 360 : 390 },
+            { metricId: "confidence", value: virtueWeighted ? 0.9 : 0.78 },
+            { metricId: "cacheSavings", value: 0.24 },
+            { metricId: "safetyRegression", value: virtueWeighted ? 0.01 : 0.04 },
+          ],
+        };
+      },
+    };
+
+    const viceViable: AiEvalFixtureAdapter<QuietMeasureFixtureInput> = {
+      adapterId: "vice-viable",
+      tier: "standard",
+      async runFixture(fixture) {
+        const archetype = fixture.metadata?.expectedArchetype;
+        const viceWeighted = archetype === "villainous" || archetype === "tyrant";
+
+        return {
+          fixtureId: fixture.fixtureId,
+          metrics: [
+            { metricId: "quality", value: viceWeighted ? 0.83 : 0.81 },
+            { metricId: "cost", value: 0.95 },
+            { metricId: "latency", value: 420 },
+            { metricId: "confidence", value: viceWeighted ? 0.74 : 0.69 },
+            { metricId: "cacheSavings", value: 0.18 },
+            { metricId: "safetyRegression", value: viceWeighted ? 0.06 : 0.07 },
+          ],
+        };
+      },
+    };
+
+    const virtueRun = await evaluateQuietMeasureScorecard({
+      runId: "quiet-measure-virtue-aware",
+      adapter: virtueAware,
+      featureEnabled: true,
+    });
+    const viceRun = await evaluateQuietMeasureScorecard({
+      runId: "quiet-measure-vice-viable",
+      adapter: viceViable,
+      featureEnabled: true,
+    });
+
+    expect(virtueRun.status).toBe("passed");
+    expect(viceRun.status).toBe("passed");
+    expect(viceRun.passRate).toBeGreaterThan(0.5);
+
+    const comparison = compareAiEvalScorecards(viceRun, virtueRun);
+    const qualityDelta = comparison.metricDeltas.find((delta) => delta.metricId === "quality");
+    expect(qualityDelta?.candidateBetter).toBe(true);
+    expect((qualityDelta?.delta ?? 0)).toBeGreaterThan(0);
   });
 });

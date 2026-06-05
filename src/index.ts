@@ -173,11 +173,313 @@ export interface AiEvalRunOptions<TInput = unknown> {
   readonly featureEnabled: boolean;
 }
 
+export const AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID =
+  "isekai.player-system.quiet-measure.enabled";
+
+export const QUIET_MEASURE_CLASSIFICATION_PATTERNS = [
+  "heroic",
+  "villainous",
+  "counterfeit-hero",
+  "counterfeit-villain",
+  "tyrant",
+  "redeemed-character",
+] as const;
+
+export type QuietMeasureClassificationPattern =
+  (typeof QUIET_MEASURE_CLASSIFICATION_PATTERNS)[number];
+
+export const QUIET_MEASURE_SIGNAL_LEVELS = [
+  "suppressed",
+  "latent",
+  "present",
+  "dominant",
+] as const;
+
+export type QuietMeasureSignalLevel =
+  (typeof QUIET_MEASURE_SIGNAL_LEVELS)[number];
+
+export const QUIET_MEASURE_PRIVATE_CONDUCT_PATTERNS = [
+  "protective",
+  "predatory",
+  "performative",
+  "repentant",
+] as const;
+
+export type QuietMeasurePrivateConductPattern =
+  (typeof QUIET_MEASURE_PRIVATE_CONDUCT_PATTERNS)[number];
+
+export const QUIET_MEASURE_PRESSURE_RESPONSES = [
+  "merciful",
+  "exploitative",
+  "mixed",
+  "restitutive",
+] as const;
+
+export type QuietMeasurePressureResponse =
+  (typeof QUIET_MEASURE_PRESSURE_RESPONSES)[number];
+
+export const QUIET_MEASURE_REPAIR_PATTERNS = [
+  "none",
+  "token",
+  "costly",
+] as const;
+
+export type QuietMeasureRepairPattern =
+  (typeof QUIET_MEASURE_REPAIR_PATTERNS)[number];
+
+export const QUIET_MEASURE_DERIVED_READS = [
+  "nature",
+  "mask",
+  "veil-gap",
+  "restitution",
+] as const;
+
+export type QuietMeasureDerivedRead =
+  (typeof QUIET_MEASURE_DERIVED_READS)[number];
+
+export const QUIET_MEASURE_PROBE_MODES = [
+  "clarify",
+  "tempt",
+  "reinforce",
+] as const;
+
+export type QuietMeasureProbeMode =
+  (typeof QUIET_MEASURE_PROBE_MODES)[number];
+
+export const QUIET_MEASURE_RESOLUTION_SHAPES = [
+  "restorative",
+  "dominant",
+  "detached",
+  "performative",
+] as const;
+
+export type QuietMeasureResolutionShape =
+  (typeof QUIET_MEASURE_RESOLUTION_SHAPES)[number];
+
+export const QUIET_MEASURE_JUDGMENT_STATES = [
+  "insufficient-evidence",
+  "eligible",
+] as const;
+
+export type QuietMeasureJudgmentState =
+  (typeof QUIET_MEASURE_JUDGMENT_STATES)[number];
+
+export const QUIET_MEASURE_OUTCOME_BIASES = [
+  "virtue-compounding",
+  "vice-viable",
+  "ambiguity-preserving",
+] as const;
+
+export type QuietMeasureOutcomeBias =
+  (typeof QUIET_MEASURE_OUTCOME_BIASES)[number];
+
+export interface QuietMeasureFixtureInput {
+  readonly synopsis: string;
+  readonly publicCourtesy: QuietMeasureSignalLevel;
+  readonly mercy: QuietMeasureSignalLevel;
+  readonly reciprocity: QuietMeasureSignalLevel;
+  readonly principledConduct: QuietMeasureSignalLevel;
+  readonly privateConduct: QuietMeasurePrivateConductPattern;
+  readonly costlyPressureResponse: QuietMeasurePressureResponse;
+  readonly repairAfterHarm: QuietMeasureRepairPattern;
+}
+
+export type QuietMeasureFixtureMetadata = Readonly<Record<string, unknown>> & {
+  readonly expectedArchetype: QuietMeasureClassificationPattern;
+  readonly expectedJudgmentState: QuietMeasureJudgmentState;
+  readonly expectedProbeMode: QuietMeasureProbeMode;
+  readonly expectedResolutionShape: QuietMeasureResolutionShape;
+  readonly expectedOutcomeBias: QuietMeasureOutcomeBias;
+  readonly expectedDominantReads: readonly QuietMeasureDerivedRead[];
+  readonly boundaryNote: string;
+};
+
+export interface QuietMeasureFixtureCase
+  extends AiEvalFixtureCase<QuietMeasureFixtureInput> {
+  readonly metadata?: QuietMeasureFixtureMetadata;
+}
+
+export interface QuietMeasureFixtureAdapter {
+  readonly adapterId: string;
+  readonly tier: AiProviderTier;
+  runFixture(fixture: QuietMeasureFixtureCase): Promise<AiEvalFixtureObservation>;
+}
+
 export const AI_EVALS_PACKAGE = "@plasius/ai-evals";
 export const AI_EVALS_FEATURE_FLAG_ID = "ai.evals-scorecards.enabled";
 export const AI_EVALS_SCORECARDS_FEATURE_FLAG_ID = "ai.evals-scorecards.enabled";
 export const AI_EVALS_ENV_PREFIX = "AI_EVALS";
 export const AI_EVALS_SCORECARDS_ENV = "AI_EVALS_SCORECARDS_ENABLED";
+export const AI_EVALS_SCORECARDS_ENABLED_ENV = AI_EVALS_SCORECARDS_ENV;
+
+export const QUIET_MEASURE_FIXTURE_CASES: readonly QuietMeasureFixtureCase[] = freezeArray([
+  {
+    fixtureId: "quiet-measure-heroic-route",
+    input: {
+      synopsis:
+        "Protects weak travelers at personal cost, shares scarce supplies, and keeps mercy steady under pressure.",
+      publicCourtesy: "present",
+      mercy: "dominant",
+      reciprocity: "present",
+      principledConduct: "present",
+      privateConduct: "protective",
+      costlyPressureResponse: "merciful",
+      repairAfterHarm: "costly",
+    },
+    note:
+      "Heroic pattern where mercy and reciprocity matter more than surface politeness.",
+    metadata: {
+      expectedArchetype: "heroic",
+      expectedJudgmentState: "eligible",
+      expectedProbeMode: "reinforce",
+      expectedResolutionShape: "restorative",
+      expectedOutcomeBias: "virtue-compounding",
+      expectedDominantReads: ["nature"],
+      boundaryNote:
+        "Public fixtures name the expected archetype and probe shape only; raw host-private score storage stays out of this package.",
+    },
+  },
+  {
+    fixtureId: "quiet-measure-villainous-route",
+    input: {
+      synopsis:
+        "Extracts tribute, hoards safety, and treats weakness as leverage while staying strategically polite when observed.",
+      publicCourtesy: "present",
+      mercy: "suppressed",
+      reciprocity: "latent",
+      principledConduct: "latent",
+      privateConduct: "predatory",
+      costlyPressureResponse: "exploitative",
+      repairAfterHarm: "none",
+    },
+    note:
+      "Villainous pattern remains viable, but should not out-compound restorative surplus over time.",
+    metadata: {
+      expectedArchetype: "villainous",
+      expectedJudgmentState: "eligible",
+      expectedProbeMode: "tempt",
+      expectedResolutionShape: "dominant",
+      expectedOutcomeBias: "vice-viable",
+      expectedDominantReads: ["nature"],
+      boundaryNote:
+        "The scorecard should treat darker paths as valid classifications without rewarding them above restorative long-horizon outcomes.",
+    },
+  },
+  {
+    fixtureId: "quiet-measure-counterfeit-hero",
+    input: {
+      synopsis:
+        "Performs elaborate manners and public generosity while privately exploiting dependents and evading costly mercy.",
+      publicCourtesy: "dominant",
+      mercy: "suppressed",
+      reciprocity: "latent",
+      principledConduct: "latent",
+      privateConduct: "performative",
+      costlyPressureResponse: "exploitative",
+      repairAfterHarm: "token",
+    },
+    note:
+      "Counterfeit-hero pattern that should fail if courtesy is allowed to dominate mercy and principle.",
+    metadata: {
+      expectedArchetype: "counterfeit-hero",
+      expectedJudgmentState: "eligible",
+      expectedProbeMode: "clarify",
+      expectedResolutionShape: "performative",
+      expectedOutcomeBias: "ambiguity-preserving",
+      expectedDominantReads: ["mask", "veil-gap"],
+      boundaryNote:
+        "Courtesy alone is insufficient; the public fixture exists to catch hosts that mistake polished manners for restorative character.",
+    },
+  },
+  {
+    fixtureId: "quiet-measure-counterfeit-villain",
+    input: {
+      synopsis:
+        "Looks rough and threatening in public, but repeatedly shields weaker parties, keeps bargains, and refuses easy cruelty in private.",
+      publicCourtesy: "suppressed",
+      mercy: "present",
+      reciprocity: "present",
+      principledConduct: "present",
+      privateConduct: "protective",
+      costlyPressureResponse: "mixed",
+      repairAfterHarm: "token",
+    },
+    note:
+      "Counterfeit-villain pattern protects rough-hero play from being flattened into vice.",
+    metadata: {
+      expectedArchetype: "counterfeit-villain",
+      expectedJudgmentState: "eligible",
+      expectedProbeMode: "clarify",
+      expectedResolutionShape: "detached",
+      expectedOutcomeBias: "ambiguity-preserving",
+      expectedDominantReads: ["mask", "nature"],
+      boundaryNote:
+        "Visible harshness must not erase repeated protective conduct in the public fixture interpretation.",
+    },
+  },
+  {
+    fixtureId: "quiet-measure-tyrant-route",
+    input: {
+      synopsis:
+        "Builds order through fear, centralizes power, and accepts obedience gains despite brittle downstream trust.",
+      publicCourtesy: "latent",
+      mercy: "suppressed",
+      reciprocity: "suppressed",
+      principledConduct: "present",
+      privateConduct: "predatory",
+      costlyPressureResponse: "exploitative",
+      repairAfterHarm: "none",
+    },
+    note:
+      "Tyrant pattern should remain classifiable and playable without overtaking restorative compounding in aggregate comparisons.",
+    metadata: {
+      expectedArchetype: "tyrant",
+      expectedJudgmentState: "eligible",
+      expectedProbeMode: "reinforce",
+      expectedResolutionShape: "dominant",
+      expectedOutcomeBias: "vice-viable",
+      expectedDominantReads: ["nature"],
+      boundaryNote:
+        "The public fixture allows tyrant outcomes to stay valid while still marking them as brittle rather than surplus-generating.",
+    },
+  },
+  {
+    fixtureId: "quiet-measure-redeemed-turn",
+    input: {
+      synopsis:
+        "After causing harm, accepts costly restitution, protects former victims in private, and changes conduct under renewed pressure.",
+      publicCourtesy: "present",
+      mercy: "present",
+      reciprocity: "dominant",
+      principledConduct: "present",
+      privateConduct: "repentant",
+      costlyPressureResponse: "restitutive",
+      repairAfterHarm: "costly",
+    },
+    note:
+      "Redeemed-character pattern must preserve restitution-driven turns as first-class outcomes.",
+    metadata: {
+      expectedArchetype: "redeemed-character",
+      expectedJudgmentState: "eligible",
+      expectedProbeMode: "reinforce",
+      expectedResolutionShape: "restorative",
+      expectedOutcomeBias: "virtue-compounding",
+      expectedDominantReads: ["restitution", "nature"],
+      boundaryNote:
+        "Redemption fixtures expose the public expectation for costly repair without disclosing internal host-private weight vectors.",
+    },
+  },
+]);
+
+export const QUIET_MEASURE_BASELINE_EXPECTATIONS: readonly AiEvalMetricExpectation[] =
+  freezeArray([
+    { metricId: "quality", threshold: { min: 0.8 } },
+    { metricId: "cost", threshold: { max: 3 } },
+    { metricId: "latency", threshold: { max: 1500 } },
+    { metricId: "confidence", threshold: { min: 0.65 } },
+    { metricId: "cacheSavings", threshold: { min: 0.1 } },
+    { metricId: "safetyRegression", threshold: { max: 0.08 } },
+  ]);
 
 export const AI_EVALS_METRIC_DEFINITIONS: readonly AiEvalMetricDefinition[] = freezeArray([
   {
@@ -440,6 +742,22 @@ export function defineAiEvalGoldenDataset<TInput = unknown>(
   });
 }
 
+export const QUIET_MEASURE_GOLDEN_DATASET = defineAiEvalGoldenDataset<QuietMeasureFixtureInput>({
+  datasetId: "quiet-measure-classification-v1",
+  version: "1.0.0",
+  name: "Quiet Measure classification and Judgment fixture pack",
+  taskType: "player-action-validation",
+  baselineExpectations: QUIET_MEASURE_BASELINE_EXPECTATIONS,
+  fixtureCases: QUIET_MEASURE_FIXTURE_CASES,
+  notes:
+    "These fixtures publish archetype and probe expectations for Quiet Measure scorecards while keeping host-private runtime scores and weights outside the package boundary.",
+  metadata: {
+    inheritedFeatureFlagId: AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID,
+    interpretationBoundary:
+      "Public fixtures expose expected archetypes, probe shapes, and outcome tendencies only; hosts retain raw scoring, per-player evidence windows, and disclosure decisions.",
+  },
+});
+
 function parseMetricObservations(observation: AiEvalFixtureObservation): readonly AiEvalMetricValue[] {
   const values = observation.metrics.map((metric) => {
     if (!readMaybeMetric(metric)) {
@@ -580,6 +898,24 @@ export async function evaluateAiEvalScorecard<TInput = unknown>(
     passRate,
     aggregate,
     fixtureResults: freezeArray(fixtureResults),
+  });
+}
+
+export async function evaluateQuietMeasureScorecard(
+  options: Omit<AiEvalRunOptions<QuietMeasureFixtureInput>, "dataset"> & {
+    readonly dataset?: AiEvalGoldenDataset<QuietMeasureFixtureInput>;
+    readonly adapter: QuietMeasureFixtureAdapter;
+  },
+): Promise<AiEvalScorecardResult> {
+  return evaluateAiEvalScorecard({
+    ...options,
+    adapter: {
+      adapterId: options.adapter.adapterId,
+      tier: options.adapter.tier,
+      runFixture: (fixture) =>
+        options.adapter.runFixture(fixture as QuietMeasureFixtureCase),
+    },
+    dataset: options.dataset ?? QUIET_MEASURE_GOLDEN_DATASET,
   });
 }
 

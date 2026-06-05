@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Added**
   - Added `@plasius/ai-evals` scorecard and golden-dataset contracts for quality, cost, latency, confidence, cache-savings, and safety-regression evaluation under `ai.evals-scorecards.enabled`.
 - Added fixture-first scorecard execution primitives (`AiEvalFixtureAdapter`, `evaluateAiEvalScorecard`, `compareAiEvalScorecards`) and dataset validation helpers.
+  - Added Quiet Measure fixture-pack exports and scorecard helpers for heroic, villainous, counterfeit, tyrant, and redeemed-character regression checks under `isekai.player-system.quiet-measure.enabled`.
 
 - **Changed**
   - Updated package feature flag contract from previous generic evaluator naming to `ai.evals-scorecards.enabled`.

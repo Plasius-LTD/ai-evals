@@ -16,6 +16,7 @@ The package supports:
 - Metric contracts for quality, cost, latency, confidence, cache savings, and safety regressions.
 - Deterministic scorecard evaluation over fixtures and fake adapter output.
 - Cross-tier scorecard comparison for development/standard/premium workflows.
+- Quiet Measure fixture packs and scorecard helpers for hidden-character classification regression checks.
 
 ## Install
 
@@ -77,6 +78,44 @@ if (isAiEvalsScorecardsEnabled({ AI_EVALS_SCORECARDS_ENABLED: "true" })) {
   console.log(AI_EVALS_FEATURE_FLAG_ID, scorecard.status);
 }
 ```
+
+## Quiet Measure Fixtures
+
+```ts
+import {
+  QUIET_MEASURE_GOLDEN_DATASET,
+  evaluateQuietMeasureScorecard,
+  type QuietMeasureFixtureAdapter,
+} from "@plasius/ai-evals";
+
+const adapter: QuietMeasureFixtureAdapter = {
+  adapterId: "quiet-measure-regression",
+  tier: "standard",
+  async runFixture(fixture) {
+    return {
+      fixtureId: fixture.fixtureId,
+      metrics: [
+        { metricId: "quality", value: 0.91 },
+        { metricId: "cost", value: 0.9 },
+        { metricId: "latency", value: 320 },
+        { metricId: "confidence", value: 0.8 },
+        { metricId: "cacheSavings", value: 0.2 },
+        { metricId: "safetyRegression", value: 0.03 },
+      ],
+      metadata: fixture.metadata,
+    };
+  },
+};
+
+const scorecard = await evaluateQuietMeasureScorecard({
+  runId: "quiet-measure-smoke",
+  adapter,
+  featureEnabled: true,
+  dataset: QUIET_MEASURE_GOLDEN_DATASET,
+});
+```
+
+The Quiet Measure fixture pack publishes expected archetypes, probe shapes, and Judgment readiness boundaries for heroic, villainous, counterfeit, tyrant, and redeemed-character patterns. It does not expose host-private runtime scores, weight vectors, or disclosure decisions; those remain inside the consuming runtime.
 
 ## Development
 
