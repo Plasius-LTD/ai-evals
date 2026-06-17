@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **Changed**
   - Updated package feature flag contract from previous generic evaluator naming to `ai.evals-scorecards.enabled`.
+  - Refreshed `@plasius/ai-config`, `@types/node`, `@typescript-eslint/*`, `eslint`, and `vitest` dependency baselines to the latest stable published versions used by this package.
 
 - **Fixed**
   - No behavior regressions fixed in runtime dependencies; all evaluator contracts are now deterministic and testable with fixtures.
