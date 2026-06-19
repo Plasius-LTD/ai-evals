@@ -305,6 +305,55 @@ export interface QuietMeasureFixtureAdapter {
   runFixture(fixture: QuietMeasureFixtureCase): Promise<AiEvalFixtureObservation>;
 }
 
+export const PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID =
+  "isekai.player-system.governance.enabled";
+
+export const PLAYER_SYSTEM_GOVERNANCE_SCORECARD_IDS = [
+  "tutorial-usefulness",
+  "mission-fit",
+  "preference-learning",
+  "voice-intent",
+  "reward-boundedness",
+] as const;
+
+export type PlayerSystemGovernanceScorecardId =
+  (typeof PLAYER_SYSTEM_GOVERNANCE_SCORECARD_IDS)[number];
+
+export type PlayerSystemGovernanceSurface =
+  | "tutorial"
+  | "missions"
+  | "preference-learning"
+  | "voice"
+  | "reward-governance";
+
+export interface PlayerSystemGovernanceFixtureInput {
+  readonly synopsis: string;
+  readonly playerStage: "awakening" | "institutional" | "advanced";
+  readonly surface: PlayerSystemGovernanceSurface;
+  readonly observedOutcome: string;
+  readonly authorityBoundary: string;
+  readonly expectedWarnings: readonly string[];
+}
+
+export type PlayerSystemGovernanceFixtureMetadata =
+  Readonly<Record<string, unknown>> & {
+    readonly scorecardId: PlayerSystemGovernanceScorecardId;
+    readonly supportedTiers: readonly AiProviderTier[];
+    readonly inheritedFeatureFlagId: string;
+    readonly authorityBoundary: string;
+    readonly feedbackLoopSummary: string;
+  };
+
+export interface PlayerSystemGovernanceFixtureCase
+  extends AiEvalFixtureCase<PlayerSystemGovernanceFixtureInput> {
+  readonly metadata?: PlayerSystemGovernanceFixtureMetadata;
+}
+
+export interface PlayerSystemGovernanceFixtureAdapter
+  extends Omit<AiEvalFixtureAdapter<PlayerSystemGovernanceFixtureInput>, "runFixture"> {
+  runFixture(fixture: PlayerSystemGovernanceFixtureCase): Promise<AiEvalFixtureObservation>;
+}
+
 export const AI_EVALS_PACKAGE = "@plasius/ai-evals";
 export const AI_EVALS_FEATURE_FLAG_ID = "ai.evals-scorecards.enabled";
 export const AI_EVALS_SCORECARDS_FEATURE_FLAG_ID = "ai.evals-scorecards.enabled";
@@ -758,6 +807,335 @@ export const QUIET_MEASURE_GOLDEN_DATASET = defineAiEvalGoldenDataset<QuietMeasu
   },
 });
 
+const PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS = freezeArray([
+  "development",
+  "standard",
+  "premium",
+] satisfies readonly AiProviderTier[]);
+
+function createPlayerSystemGovernanceDataset(options: {
+  readonly scorecardId: PlayerSystemGovernanceScorecardId;
+  readonly version: string;
+  readonly name: string;
+  readonly baselineExpectations: readonly AiEvalMetricExpectation[];
+  readonly fixtureCases: readonly PlayerSystemGovernanceFixtureCase[];
+  readonly notes: string;
+}): AiEvalGoldenDataset<PlayerSystemGovernanceFixtureInput> {
+  return defineAiEvalGoldenDataset<PlayerSystemGovernanceFixtureInput>({
+    datasetId: `player-system-${options.scorecardId}-v1`,
+    version: options.version,
+    name: options.name,
+    taskType: "player-action-validation",
+    baselineExpectations: options.baselineExpectations,
+    fixtureCases: options.fixtureCases,
+    notes: options.notes,
+    metadata: {
+      inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+      scorecardId: options.scorecardId,
+      supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+    },
+  });
+}
+
+export const PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS = Object.freeze({
+  "tutorial-usefulness": createPlayerSystemGovernanceDataset({
+    scorecardId: "tutorial-usefulness",
+    version: "1.0.0",
+    name: "Player System tutorial usefulness scorecard fixtures",
+    baselineExpectations: freezeArray([
+      { metricId: "quality", threshold: { min: 0.82 } },
+      { metricId: "latency", threshold: { max: 1400 } },
+      { metricId: "confidence", threshold: { min: 0.72 } },
+      { metricId: "safetyRegression", threshold: { max: 0.04 } },
+    ]),
+    fixtureCases: freezeArray([
+      {
+        fixtureId: "tutorial-awakening-recovery-window",
+        input: {
+          synopsis:
+            "Awakening guidance reappears immediately after the player exits danger instead of several interactions later.",
+          playerStage: "awakening",
+          surface: "tutorial",
+          observedOutcome: "Coaching resumed within one safe shell transition.",
+          authorityBoundary: "Tutorial shell may recommend, but world authority still owns progression.",
+          expectedWarnings: [],
+        },
+        note:
+          "Catches regressions where tutorial prompts appear after the teachable moment has already passed.",
+        metadata: {
+          scorecardId: "tutorial-usefulness",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary:
+            "Tutorial shell may recommend, but world authority still owns progression.",
+          feedbackLoopSummary:
+            "Measures whether tutorial interventions stay close to the triggering moment.",
+        },
+      },
+      {
+        fixtureId: "tutorial-advanced-track-guard",
+        input: {
+          synopsis:
+            "Advanced coaching stays blocked until prerequisites are complete and the shell explains the missing institution gate.",
+          playerStage: "institutional",
+          surface: "tutorial",
+          observedOutcome: "The player receives a blocked-prerequisite explanation instead of a premature unlock.",
+          authorityBoundary: "Schools and barracks remain the unlock authority.",
+          expectedWarnings: ["institution-gate-required"],
+        },
+        note:
+          "Prevents tutorial usefulness from being overstated by unlocking routes the player cannot actually enter.",
+        metadata: {
+          scorecardId: "tutorial-usefulness",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary: "Schools and barracks remain the unlock authority.",
+          feedbackLoopSummary:
+            "Measures whether blocked coaching still stays useful through explicit explanation.",
+        },
+      },
+    ]),
+    notes:
+      "Tutorial usefulness fixtures validate that governance hooks can measure timeliness and prerequisite-safe coaching without granting authority.",
+  }),
+  "mission-fit": createPlayerSystemGovernanceDataset({
+    scorecardId: "mission-fit",
+    version: "1.0.0",
+    name: "Player System mission-fit scorecard fixtures",
+    baselineExpectations: freezeArray([
+      { metricId: "quality", threshold: { min: 0.84 } },
+      { metricId: "confidence", threshold: { min: 0.74 } },
+      { metricId: "latency", threshold: { max: 1500 } },
+      { metricId: "safetyRegression", threshold: { max: 0.04 } },
+    ]),
+    fixtureCases: freezeArray([
+      {
+        fixtureId: "mission-fit-civic-readiness",
+        input: {
+          synopsis:
+            "The shell recommends a civic-duty quest that matches the current authority band and avoids later-stage power skips.",
+          playerStage: "institutional",
+          surface: "missions",
+          observedOutcome: "Accepted route stays inside civic readiness and does not bypass training authority.",
+          authorityBoundary: "Guild and institution contracts still decide actual reward truth.",
+          expectedWarnings: [],
+        },
+        metadata: {
+          scorecardId: "mission-fit",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary:
+            "Guild and institution contracts still decide actual reward truth.",
+          feedbackLoopSummary:
+            "Measures whether recommended missions match readiness instead of forcing power skips.",
+        },
+      },
+      {
+        fixtureId: "mission-fit-misleading-escalation",
+        input: {
+          synopsis:
+            "The shell surfaces a mission preview but must warn that academy authority has not yet cleared the specialization gate.",
+          playerStage: "advanced",
+          surface: "missions",
+          observedOutcome: "Preview shown, grant blocked, warning retained.",
+          authorityBoundary: "Academy specialization remains authoritative.",
+          expectedWarnings: ["institution-confirmation-pending"],
+        },
+        metadata: {
+          scorecardId: "mission-fit",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary: "Academy specialization remains authoritative.",
+          feedbackLoopSummary:
+            "Measures whether mission previews remain honest when institutional authority has not yet cleared the route.",
+        },
+      },
+    ]),
+    notes:
+      "Mission-fit fixtures measure whether recommended work stays within the player's current readiness and authority boundary.",
+  }),
+  "preference-learning": createPlayerSystemGovernanceDataset({
+    scorecardId: "preference-learning",
+    version: "1.0.0",
+    name: "Player System preference-learning scorecard fixtures",
+    baselineExpectations: freezeArray([
+      { metricId: "quality", threshold: { min: 0.8 } },
+      { metricId: "confidence", threshold: { min: 0.7 } },
+      { metricId: "cacheSavings", threshold: { min: 0.05 } },
+      { metricId: "safetyRegression", threshold: { max: 0.04 } },
+    ]),
+    fixtureCases: freezeArray([
+      {
+        fixtureId: "preference-learning-governance-bias",
+        input: {
+          synopsis:
+            "Recent accept and complete actions keep reinforcing a governance-heavy mission bias.",
+          playerStage: "institutional",
+          surface: "preference-learning",
+          observedOutcome: "Preference branch remains coherent across the last several accepted missions.",
+          authorityBoundary: "The shell may learn from behavior but cannot grant rank or unlocks.",
+          expectedWarnings: [],
+        },
+        metadata: {
+          scorecardId: "preference-learning",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary:
+            "The shell may learn from behavior but cannot grant rank or unlocks.",
+          feedbackLoopSummary:
+            "Measures whether preference learning remains coherent without overruling world authority.",
+        },
+      },
+      {
+        fixtureId: "preference-learning-branch-drift",
+        input: {
+          synopsis:
+            "Mixed recent behavior forces the shell to flag branch drift instead of pretending one route is clearly dominant.",
+          playerStage: "advanced",
+          surface: "preference-learning",
+          observedOutcome: "Preference drift warning retained for human review.",
+          authorityBoundary: "Preference summaries remain advisory only.",
+          expectedWarnings: ["manual-review-for-drift"],
+        },
+        metadata: {
+          scorecardId: "preference-learning",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary: "Preference summaries remain advisory only.",
+          feedbackLoopSummary:
+            "Measures whether the learning loop admits uncertainty instead of overfitting noisy behavior.",
+        },
+      },
+    ]),
+    notes:
+      "Preference-learning fixtures measure branch coherence and drift handling for governance-guided mission shaping.",
+  }),
+  "voice-intent": createPlayerSystemGovernanceDataset({
+    scorecardId: "voice-intent",
+    version: "1.0.0",
+    name: "Player System voice-intent scorecard fixtures",
+    baselineExpectations: freezeArray([
+      { metricId: "quality", threshold: { min: 0.84 } },
+      { metricId: "latency", threshold: { max: 900 } },
+      { metricId: "confidence", threshold: { min: 0.78 } },
+      { metricId: "safetyRegression", threshold: { max: 0.03 } },
+    ]),
+    fixtureCases: freezeArray([
+      {
+        fixtureId: "voice-intent-clean-resolution",
+        input: {
+          synopsis:
+            "A spoken request to inspect the next training surface resolves without manual repair.",
+          playerStage: "institutional",
+          surface: "voice",
+          observedOutcome: "Intent resolved directly to a bounded training-routing explanation.",
+          authorityBoundary: "Voice intents may navigate or explain, but not mutate authority-owned state.",
+          expectedWarnings: [],
+        },
+        metadata: {
+          scorecardId: "voice-intent",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary:
+            "Voice intents may navigate or explain, but not mutate authority-owned state.",
+          feedbackLoopSummary:
+            "Measures whether spoken intents classify safely without extra clarification.",
+        },
+      },
+      {
+        fixtureId: "voice-intent-manual-fallback",
+        input: {
+          synopsis:
+            "A noisy overdrive request requires clarification and then falls back to manual confirmation.",
+          playerStage: "advanced",
+          surface: "voice",
+          observedOutcome: "Manual fallback preserved instead of forcing a risky classification.",
+          authorityBoundary: "Manual confirmation remains authoritative when speech confidence drops.",
+          expectedWarnings: ["manual-confirmation-required"],
+        },
+        metadata: {
+          scorecardId: "voice-intent",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary:
+            "Manual confirmation remains authoritative when speech confidence drops.",
+          feedbackLoopSummary:
+            "Measures whether the shell fails closed on ambiguous voice requests.",
+        },
+      },
+    ]),
+    notes:
+      "Voice-intent fixtures measure safe classification, clarification rate, and manual fallback behavior for spoken governance flows.",
+  }),
+  "reward-boundedness": createPlayerSystemGovernanceDataset({
+    scorecardId: "reward-boundedness",
+    version: "1.0.0",
+    name: "Player System reward-boundedness scorecard fixtures",
+    baselineExpectations: freezeArray([
+      { metricId: "quality", threshold: { min: 0.88 } },
+      { metricId: "confidence", threshold: { min: 0.8 } },
+      { metricId: "latency", threshold: { max: 1100 } },
+      { metricId: "safetyRegression", threshold: { max: 0.02 } },
+    ]),
+    fixtureCases: freezeArray([
+      {
+        fixtureId: "reward-boundedness-approved-preview",
+        input: {
+          synopsis:
+            "A mission reward preview stays within global and session caps and waits for the external authority grant.",
+          playerStage: "institutional",
+          surface: "reward-governance",
+          observedOutcome: "Preview shown without exceeding caps or bypassing the guild reward grant.",
+          authorityBoundary: "Guild reward truth remains authoritative.",
+          expectedWarnings: [],
+        },
+        metadata: {
+          scorecardId: "reward-boundedness",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary: "Guild reward truth remains authoritative.",
+          feedbackLoopSummary:
+            "Measures whether reward previews remain bounded and authority-safe.",
+        },
+      },
+      {
+        fixtureId: "reward-boundedness-cap-pressure",
+        input: {
+          synopsis:
+            "The shell warns that a trust-surplus preview is one grant away from the session cap and blocks duplicate minting.",
+          playerStage: "advanced",
+          surface: "reward-governance",
+          observedOutcome: "Reward remains blocked with cap and duplicate-ledger warnings intact.",
+          authorityBoundary: "The shell may warn, but cannot self-grant around caps.",
+          expectedWarnings: [
+            "session-cap-nearly-exhausted",
+            "duplicate-ledger-blocked",
+          ],
+        },
+        metadata: {
+          scorecardId: "reward-boundedness",
+          supportedTiers: PLAYER_SYSTEM_GOVERNANCE_SUPPORTED_TIERS,
+          inheritedFeatureFlagId: PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+          authorityBoundary: "The shell may warn, but cannot self-grant around caps.",
+          feedbackLoopSummary:
+            "Measures whether bounded reward checks fail closed before unsafe grants.",
+        },
+      },
+    ]),
+    notes:
+      "Reward-boundedness fixtures measure cap pressure, duplicate-grant protection, and authority-safe preview behavior.",
+  }),
+} satisfies Record<
+  PlayerSystemGovernanceScorecardId,
+  AiEvalGoldenDataset<PlayerSystemGovernanceFixtureInput>
+>);
+
+export function getPlayerSystemGovernanceGoldenDataset(
+  scorecardId: PlayerSystemGovernanceScorecardId
+): AiEvalGoldenDataset<PlayerSystemGovernanceFixtureInput> {
+  return PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS[scorecardId];
+}
+
 function parseMetricObservations(observation: AiEvalFixtureObservation): readonly AiEvalMetricValue[] {
   const values = observation.metrics.map((metric) => {
     if (!readMaybeMetric(metric)) {
@@ -916,6 +1294,27 @@ export async function evaluateQuietMeasureScorecard(
         options.adapter.runFixture(fixture as QuietMeasureFixtureCase),
     },
     dataset: options.dataset ?? QUIET_MEASURE_GOLDEN_DATASET,
+  });
+}
+
+export async function evaluatePlayerSystemGovernanceScorecard(
+  options: Omit<AiEvalRunOptions<PlayerSystemGovernanceFixtureInput>, "dataset"> & {
+    readonly scorecardId: PlayerSystemGovernanceScorecardId;
+    readonly dataset?: AiEvalGoldenDataset<PlayerSystemGovernanceFixtureInput>;
+    readonly adapter: PlayerSystemGovernanceFixtureAdapter;
+  }
+): Promise<AiEvalScorecardResult> {
+  return evaluateAiEvalScorecard({
+    ...options,
+    adapter: {
+      adapterId: options.adapter.adapterId,
+      tier: options.adapter.tier,
+      runFixture: (fixture) =>
+        options.adapter.runFixture(fixture as PlayerSystemGovernanceFixtureCase),
+    },
+    dataset:
+      options.dataset
+      ?? getPlayerSystemGovernanceGoldenDataset(options.scorecardId),
   });
 }
 
