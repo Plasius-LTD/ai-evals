@@ -181,6 +181,21 @@ npm run pack:check
 - CLA and legal docs: [legal](./legal)
 - Rollback guidance: disable `ai.evals-scorecards.enabled` to avoid automatic production grade evaluation runs, and rerun with known-good baseline scorecards.
 
+## Release Workflow
+
+Protected `main` releases use a two-step flow:
+
+1. Run `.github/workflows/cd.yml` with `bump=patch|minor|major` to push a
+   `release/vX.Y.Z` prep branch and, when repository settings allow it, open
+   the matching PR from `main`.
+2. Merge that PR to `main` so the next `main` push can detect the unpublished
+   versioned metadata, tag the release, publish to npm, and publish the GitHub
+   release.
+
+If a release version is already prepared on `main` and only publication
+remains, rerun `.github/workflows/cd.yml` with `bump=none` to publish the
+current version from `main` without creating a new release branch.
+
 ## License
 
 Apache-2.0

@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 - **Fixed**
   - No behavior regressions fixed in runtime dependencies; all evaluator contracts are now deterministic and testable with fixtures.
+  - Moved package publication to a protected-main-safe release-prep flow so `cd.yml` no longer fails on direct pushes to protected `main`.
 
 - **Security**
   - (placeholder)
