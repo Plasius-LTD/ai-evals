@@ -117,6 +117,52 @@ const scorecard = await evaluateQuietMeasureScorecard({
 
 The Quiet Measure fixture pack publishes expected archetypes, probe shapes, and Judgment readiness boundaries for heroic, villainous, counterfeit, tyrant, and redeemed-character patterns. It does not expose host-private runtime scores, weight vectors, or disclosure decisions; those remain inside the consuming runtime.
 
+## Player System Governance Scorecards
+
+```ts
+import {
+  evaluatePlayerSystemGovernanceScorecard,
+  PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS,
+} from "@plasius/ai-evals";
+
+const scorecard = await evaluatePlayerSystemGovernanceScorecard({
+  runId: "player-system-voice-intent-smoke",
+  scorecardId: "voice-intent",
+  featureEnabled: true,
+  adapter: {
+    adapterId: "player-system-governance-evals",
+    tier: "standard",
+    async runFixture(fixture) {
+      return {
+        fixtureId: fixture.fixtureId,
+        metrics: [
+          { metricId: "quality", value: 0.9 },
+          { metricId: "latency", value: 380 },
+          { metricId: "confidence", value: 0.84 },
+          { metricId: "safetyRegression", value: 0.01 },
+        ],
+      };
+    },
+  },
+});
+
+console.log(
+  PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS["voice-intent"].datasetId,
+  scorecard.status,
+);
+```
+
+These datasets stay tied to the inherited Player System rollout
+`isekai.player-system.governance.enabled` while remaining reusable across
+development, standard, and premium evaluation tiers. The package publishes
+fixture coverage for:
+
+- tutorial usefulness
+- mission fit
+- preference learning
+- voice intent
+- reward boundedness
+
 ## Development
 
 ```bash
