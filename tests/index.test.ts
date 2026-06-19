@@ -21,6 +21,7 @@ import {
   QUIET_MEASURE_FIXTURE_CASES,
   QUIET_MEASURE_GOLDEN_DATASET,
   evaluatePlayerSystemGovernanceScorecard,
+  type PlayerSystemGovernanceFixtureAdapter,
   type QuietMeasureFixtureInput,
 } from "../src/index.js";
 
@@ -62,32 +63,43 @@ describe("@plasius/ai-evals", () => {
   });
 
   it("evaluates Player System governance scorecards through the generic scorecard engine", async () => {
+    let observedScorecardId: string | undefined;
+    let observedFeatureFlagId: string | undefined;
+    const adapter: PlayerSystemGovernanceFixtureAdapter = {
+      adapterId: "player-system-governance-evals",
+      tier: "standard",
+      async runFixture(fixture) {
+        observedScorecardId = fixture.metadata?.scorecardId;
+        observedFeatureFlagId = fixture.metadata?.inheritedFeatureFlagId;
+        return {
+          fixtureId: fixture.fixtureId,
+          metrics: [
+            { metricId: "quality", value: 0.92 },
+            { metricId: "latency", value: 420 },
+            { metricId: "confidence", value: 0.83 },
+            { metricId: "safetyRegression", value: 0.01 },
+          ],
+          metadata: {
+            scorecardId: fixture.metadata?.scorecardId,
+            inheritedFeatureFlagId: fixture.metadata?.inheritedFeatureFlagId,
+          },
+        };
+      },
+    };
+
     const scorecard = await evaluatePlayerSystemGovernanceScorecard({
       runId: "player-system-governance-voice",
       scorecardId: "voice-intent",
       featureEnabled: true,
-      adapter: {
-        adapterId: "player-system-governance-evals",
-        tier: "standard",
-        async runFixture(fixture) {
-          return {
-            fixtureId: fixture.fixtureId,
-            metrics: [
-              { metricId: "quality", value: 0.92 },
-              { metricId: "latency", value: 420 },
-              { metricId: "confidence", value: 0.83 },
-              { metricId: "safetyRegression", value: 0.01 },
-            ],
-            metadata: fixture.metadata,
-          };
-        },
-      },
+      adapter,
     });
 
     expect(scorecard.status).toBe("passed");
     expect(scorecard.datasetId).toBe("player-system-voice-intent-v1");
     expect(scorecard.fixtureCount).toBe(2);
     expect(scorecard.passRate).toBe(1);
+    expect(observedScorecardId).toBe("voice-intent");
+    expect(observedFeatureFlagId).toBe("isekai.player-system.governance.enabled");
   });
 
   it("builds a frozen golden dataset contract and evaluates a passing scorecard", async () => {

@@ -349,8 +349,10 @@ export interface PlayerSystemGovernanceFixtureCase
   readonly metadata?: PlayerSystemGovernanceFixtureMetadata;
 }
 
-export type PlayerSystemGovernanceFixtureAdapter =
-  AiEvalFixtureAdapter<PlayerSystemGovernanceFixtureInput>;
+export interface PlayerSystemGovernanceFixtureAdapter
+  extends Omit<AiEvalFixtureAdapter<PlayerSystemGovernanceFixtureInput>, "runFixture"> {
+  runFixture(fixture: PlayerSystemGovernanceFixtureCase): Promise<AiEvalFixtureObservation>;
+}
 
 export const AI_EVALS_PACKAGE = "@plasius/ai-evals";
 export const AI_EVALS_FEATURE_FLAG_ID = "ai.evals-scorecards.enabled";
