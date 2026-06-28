@@ -9,6 +9,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.9] - 2026-06-28
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Refreshed the `@plasius/ai-config` dependency to `^0.1.7` and updated development dependency baselines to `@types/node@26.0.1`, `@typescript-eslint/*@8.62.0`, `eslint@10.6.0`, and `globals@17.7.0`.
 
 - **Fixed**
@@ -103,3 +117,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 [0.1.6]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.6
 [0.1.7]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.7
 [0.1.8]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.8
+[0.1.9]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.9
