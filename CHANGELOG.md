@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Refreshed the `@plasius/ai-config` dependency to `^0.1.7` and updated development dependency baselines to `@types/node@26.0.1`, `@typescript-eslint/*@8.62.0`, `eslint@10.6.0`, and `globals@17.7.0`.
 
 - **Fixed**
   - (placeholder)
