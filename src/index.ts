@@ -170,7 +170,7 @@ export interface AiEvalRunOptions<TInput = unknown> {
   readonly runId: string;
   readonly dataset: AiEvalGoldenDataset<TInput>;
   readonly adapter: AiEvalFixtureAdapter<TInput>;
-  readonly featureEnabled: boolean;
+  readonly featureEnabled?: boolean;
 }
 
 export const AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID =
