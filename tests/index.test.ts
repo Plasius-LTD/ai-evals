@@ -37,8 +37,55 @@ describe("@plasius/ai-evals", () => {
     const env = { AI_EVALS_SCORECARDS_ENABLED: "true" };
     expect(AI_EVALS_FEATURE_FLAG_ID).toBe("ai.evals-scorecards.enabled");
     expect(AI_EVALS_SCORECARDS_FEATURE_FLAG_ID).toBe("ai.evals-scorecards.enabled");
+    expect(AI_EVALS_SCORECARDS_ENABLED_ENV).toBe("AI_EVALS_SCORECARDS_ENABLED");
     expect(isAiEvalsScorecardsEnabled(env)).toBe(true);
     expect(isAiEvalsScorecardsEnabled({ AI_EVALS_SCORECARDS_ENABLED: "false" })).toBe(false);
+  });
+
+  it("defaults scorecard execution disabled without reading process.env rollout gates", async () => {
+    const originalScorecardEnv = process.env.AI_EVALS_SCORECARDS_ENABLED;
+    const originalPrefixEnv = process.env.AI_EVALS_ENABLED;
+    process.env.AI_EVALS_SCORECARDS_ENABLED = "true";
+    process.env.AI_EVALS_ENABLED = "true";
+
+    try {
+      const adapter: AiEvalFixtureAdapter<{ prompt: string }> = {
+        adapterId: "env-poisoned-evals",
+        tier: "development",
+        async runFixture() {
+          throw new Error("scorecard fixtures should not run while featureEnabled is omitted");
+        },
+      };
+
+      const scorecard = await evaluateAiEvalScorecard({
+        runId: "env-poisoned-disabled-default",
+        dataset: defineAiEvalGoldenDataset({
+          datasetId: "env-poisoned-dataset",
+          version: "1.0.0",
+          name: "Env poisoned dataset",
+          taskType: "moderation",
+          baselineExpectations: [{ metricId: "quality", threshold: { min: 0.8 } }],
+          fixtureCases: [{ fixtureId: "case-1", input: { prompt: "ignored" } }],
+        }),
+        adapter,
+      });
+
+      expect(scorecard.status).toBe("disabled");
+      expect(scorecard.featureEnabled).toBe(false);
+      expect(scorecard.executedFixtureCount).toBe(0);
+    } finally {
+      if (originalScorecardEnv === undefined) {
+        delete process.env.AI_EVALS_SCORECARDS_ENABLED;
+      } else {
+        process.env.AI_EVALS_SCORECARDS_ENABLED = originalScorecardEnv;
+      }
+
+      if (originalPrefixEnv === undefined) {
+        delete process.env.AI_EVALS_ENABLED;
+      } else {
+        process.env.AI_EVALS_ENABLED = originalPrefixEnv;
+      }
+    }
   });
 
   it("publishes Player System governance datasets for each scorecard lane", () => {
