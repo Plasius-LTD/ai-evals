@@ -7,7 +7,7 @@ Golden datasets, scorecards, threshold, and regression comparison contracts for 
 This package is part of the layered `@plasius/ai-*` package family. It provides evaluator contracts, fixture definitions, and scorecard utilities used for AI quality and safety governance.
 
 - Feature flag key: `ai.evals-scorecards.enabled`
-- Package flag constant: `AI_EVALS_SCORECARDS_ENABLED`
+- Deprecated local-tooling env constant: `AI_EVALS_SCORECARDS_ENABLED`
 - Runtime namespace: `AI_EVALS`
 
 The package supports:
@@ -33,7 +33,6 @@ import {
   AiEvalMetricExpectation,
   defineAiEvalGoldenDataset,
   evaluateAiEvalScorecard,
-  isAiEvalsScorecardsEnabled,
 } from "@plasius/ai-evals";
 
 const expectations: readonly AiEvalMetricExpectation[] = [
@@ -67,17 +66,21 @@ const adapter: AiEvalFixtureAdapter<{ prompt: string }> = {
   },
 };
 
-if (isAiEvalsScorecardsEnabled({ AI_EVALS_SCORECARDS_ENABLED: "true" })) {
-  const scorecard = await evaluateAiEvalScorecard({
-    runId: "manual-smoke",
-    dataset,
-    adapter,
-    featureEnabled: true,
-  });
+const scorecard = await evaluateAiEvalScorecard({
+  runId: "manual-smoke",
+  dataset,
+  adapter,
+  featureEnabled: true,
+});
 
-  console.log(AI_EVALS_FEATURE_FLAG_ID, scorecard.status);
-}
+console.log(AI_EVALS_FEATURE_FLAG_ID, scorecard.status);
 ```
+
+Host applications must pass `featureEnabled` from their feature-flag service.
+When omitted, scorecard execution defaults disabled. The exported
+`AI_EVALS_SCORECARDS_ENABLED` env-name constants and `isAiEvalsScorecardsEnabled`
+helper are retained only for older local tooling and must not be used as a
+production rollout source of truth.
 
 ## Quiet Measure Fixtures
 

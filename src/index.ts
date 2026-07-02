@@ -358,7 +358,17 @@ export const AI_EVALS_PACKAGE = "@plasius/ai-evals";
 export const AI_EVALS_FEATURE_FLAG_ID = "ai.evals-scorecards.enabled";
 export const AI_EVALS_SCORECARDS_FEATURE_FLAG_ID = "ai.evals-scorecards.enabled";
 export const AI_EVALS_ENV_PREFIX = "AI_EVALS";
+/**
+ * @deprecated Runtime rollout decisions must come from the host application's
+ * feature-flag service. This env name remains exported only for source
+ * compatibility with older local tooling.
+ */
 export const AI_EVALS_SCORECARDS_ENV = "AI_EVALS_SCORECARDS_ENABLED";
+/**
+ * @deprecated Runtime rollout decisions must come from the host application's
+ * feature-flag service. This env name remains exported only for source
+ * compatibility with older local tooling.
+ */
 export const AI_EVALS_SCORECARDS_ENABLED_ENV = AI_EVALS_SCORECARDS_ENV;
 
 export const QUIET_MEASURE_FIXTURE_CASES: readonly QuietMeasureFixtureCase[] = freezeArray([
@@ -719,6 +729,11 @@ function aggregateMetricResults(
   });
 }
 
+/**
+ * @deprecated Prefer passing the resolved feature-flag decision into
+ * `evaluateAiEvalScorecard({ featureEnabled })`. This helper is retained for
+ * local tooling compatibility and is not used by scorecard execution.
+ */
 export function isAiEvalsScorecardsEnabled(env: Record<string, string | undefined> = {}): boolean {
   return isEnabledFromEnv(env[AI_EVALS_SCORECARDS_ENV]) || isEnabledFromEnv(env[`${AI_EVALS_ENV_PREFIX}_ENABLED`]);
 }
@@ -1159,8 +1174,7 @@ export async function evaluateAiEvalScorecard<TInput = unknown>(
 ): Promise<AiEvalScorecardResult> {
   const dataset = defineAiEvalGoldenDataset(options.dataset);
   const runId = options.runId.trim();
-  const featureEnabled =
-    options.featureEnabled ?? isAiEvalsScorecardsEnabled(process.env as Record<string, string | undefined>);
+  const featureEnabled = options.featureEnabled ?? false;
 
   if (!runId) {
     throw new Error("runId must be a non-empty string.");

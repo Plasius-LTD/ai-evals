@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - Scorecard execution now defaults disabled unless callers pass an explicit feature-flag decision; env-name helpers remain only as deprecated local-tooling compatibility APIs.
 
 - **Fixed**
   - (placeholder)
