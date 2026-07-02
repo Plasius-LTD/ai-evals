@@ -9,6 +9,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [0.1.10] - 2026-07-02
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - Scorecard execution now defaults disabled unless callers pass an explicit feature-flag decision; env-name helpers remain only as deprecated local-tooling compatibility APIs.
 
 - **Fixed**
@@ -118,3 +132,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 [0.1.7]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.7
 [0.1.8]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.8
 [0.1.9]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.9
+[0.1.10]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.10
