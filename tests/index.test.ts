@@ -90,7 +90,7 @@ describe("@plasius/ai-evals", () => {
 
   it("publishes Player System governance datasets for each scorecard lane", () => {
     expect(PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID).toBe(
-      "isekai.player-system.governance.enabled",
+      "harmony.player-system.governance.enabled",
     );
     expect(Object.keys(PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS)).toEqual([
       "tutorial-usefulness",
@@ -102,7 +102,7 @@ describe("@plasius/ai-evals", () => {
     expect(
       PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS["voice-intent"].metadata
         ?.inheritedFeatureFlagId,
-    ).toBe("isekai.player-system.governance.enabled");
+    ).toBe("harmony.player-system.governance.enabled");
     expect(
       PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS["reward-boundedness"].fixtureCases[1]
         ?.metadata?.supportedTiers,
@@ -146,7 +146,7 @@ describe("@plasius/ai-evals", () => {
     expect(scorecard.fixtureCount).toBe(2);
     expect(scorecard.passRate).toBe(1);
     expect(observedScorecardId).toBe("voice-intent");
-    expect(observedFeatureFlagId).toBe("isekai.player-system.governance.enabled");
+    expect(observedFeatureFlagId).toBe("harmony.player-system.governance.enabled");
   });
 
   it("builds a frozen golden dataset contract and evaluates a passing scorecard", async () => {
@@ -343,7 +343,7 @@ describe("@plasius/ai-evals", () => {
 
   it("publishes a Quiet Measure fixture pack with the expected archetype coverage", () => {
     expect(AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID).toBe(
-      "isekai.player-system.quiet-measure.enabled",
+      "harmony.player-system.quiet-measure.enabled",
     );
     expect(QUIET_MEASURE_GOLDEN_DATASET.datasetId).toBe(
       "quiet-measure-classification-v1",
@@ -366,6 +366,24 @@ describe("@plasius/ai-evals", () => {
           && fixture.metadata.boundaryNote.length > 0,
       ),
     ).toBe(true);
+  });
+
+  it("contains no legacy Isekai namespace in exported runtime rollout contracts", () => {
+    const rolloutContracts = [
+      AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID,
+      PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
+      ...Object.values(PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS).map(
+        (dataset) => dataset.metadata?.inheritedFeatureFlagId,
+      ),
+    ];
+
+    expect(rolloutContracts).not.toContain(undefined);
+    expect(
+      rolloutContracts.every((value) => value?.startsWith("harmony.")),
+    ).toBe(true);
+    expect(
+      rolloutContracts.some((value) => value?.startsWith("isekai.")),
+    ).toBe(false);
   });
 
   it("uses Quiet Measure scorecards to catch courtesy-dominant counterfeit-hero classifications", async () => {

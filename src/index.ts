@@ -174,7 +174,7 @@ export interface AiEvalRunOptions<TInput = unknown> {
 }
 
 export const AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID =
-  "isekai.player-system.quiet-measure.enabled";
+  "harmony.player-system.quiet-measure.enabled";
 
 export const QUIET_MEASURE_CLASSIFICATION_PATTERNS = [
   "heroic",
@@ -306,7 +306,7 @@ export interface QuietMeasureFixtureAdapter {
 }
 
 export const PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID =
-  "isekai.player-system.governance.enabled";
+  "harmony.player-system.governance.enabled";
 
 export const PLAYER_SYSTEM_GOVERNANCE_SCORECARD_IDS = [
   "tutorial-usefulness",

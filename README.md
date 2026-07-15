@@ -156,7 +156,7 @@ console.log(
 ```
 
 These datasets stay tied to the inherited Player System rollout
-`isekai.player-system.governance.enabled` while remaining reusable across
+`harmony.player-system.governance.enabled` while remaining reusable across
 development, standard, and premium evaluation tiers. The package publishes
 fixture coverage for:
 
@@ -165,6 +165,22 @@ fixture coverage for:
 - preference learning
 - voice intent
 - reward boundedness
+
+## Project Harmony namespace migration
+
+The Project Harmony cutover is a breaking contract change. Consumers moving to
+the next major release must replace these exact rollout keys before enabling
+`harmony.namespace-cutover.enabled`:
+
+| Previous key | Harmony key |
+| --- | --- |
+| `isekai.player-system.governance.enabled` | `harmony.player-system.governance.enabled` |
+| `isekai.player-system.quiet-measure.enabled` | `harmony.player-system.quiet-measure.enabled` |
+
+The package publishes only the Harmony values. It does not provide aliases,
+dual-read parsing, environment fallback, or runtime translation. Host
+applications remain responsible for passing evaluated rollout decisions through
+`featureEnabled`.
 
 ## Development
 
@@ -183,6 +199,7 @@ npm run pack:check
 - ADRs: [docs/adrs](./docs/adrs)
 - CLA and legal docs: [legal](./legal)
 - Rollback guidance: disable `ai.evals-scorecards.enabled` to avoid automatic production grade evaluation runs, and rerun with known-good baseline scorecards.
+- Namespace rollback: disable `harmony.namespace-cutover.enabled`, restore the previous package major with the coordinated release train, and run the approved reverse stored-value migration before re-enabling consumers.
 
 ## Release Workflow
 
