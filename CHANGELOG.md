@@ -9,7 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Changed**
-  - (placeholder)
+  - **Breaking:** replaced the exported Player System governance and Quiet Measure rollout values from `isekai.player-system.*` to `harmony.player-system.*`. The next release is a major version and intentionally provides no aliases, dual-read parsing, or legacy runtime fallback.
 
 - **Fixed**
   - (placeholder)
