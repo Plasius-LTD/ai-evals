@@ -9,6 +9,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Changed**
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.0] - 2026-07-15
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - **Breaking:** replaced the exported Player System governance and Quiet Measure rollout values from `isekai.player-system.*` to `harmony.player-system.*`. The next release is a major version and intentionally provides no aliases, dual-read parsing, or legacy runtime fallback.
 
 - **Fixed**
@@ -148,3 +162,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 [0.1.9]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.9
 [0.1.10]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.10
 [0.1.11]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.11
+[1.0.0]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v1.0.0
