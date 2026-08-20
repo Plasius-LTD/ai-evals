@@ -76,11 +76,24 @@ const scorecard = await evaluateAiEvalScorecard({
 console.log(AI_EVALS_FEATURE_FLAG_ID, scorecard.status);
 ```
 
-Host applications must pass `featureEnabled` from their feature-flag service.
-When omitted, scorecard execution defaults disabled. The exported
+Host applications should pass `featureEnabled` from their feature-flag service.
+The option is intentionally optional so callers can omit it safely: omission
+and explicit `false` both fail closed with zero fixture execution. Scorecards
+never read `process.env` implicitly. The exported
 `AI_EVALS_SCORECARDS_ENABLED` env-name constants and `isAiEvalsScorecardsEnabled`
 helper are retained only for older local tooling and must not be used as a
 production rollout source of truth.
+
+Aggregate metric `sampleCount` and `passRate` cover every fixture that requires
+the metric. Missing values, `NaN`, infinities, and adapter failures therefore
+remain failed samples in the denominator instead of making a partial result
+look complete. `observedCount`, `average`, `min`, and `max` continue to describe
+only finite observations. Thresholds are copied and frozen into the normalized
+dataset and scorecard so later caller mutation cannot rewrite audit evidence.
+Duplicate metric expectations are rejected. A metric introduced only through
+fixture overrides must use one consistent threshold across those fixtures;
+otherwise no truthful single aggregate threshold exists and dataset definition
+fails closed.
 
 ## Quiet Measure Fixtures
 

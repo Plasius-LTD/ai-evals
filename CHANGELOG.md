@@ -12,10 +12,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Aggregate metric pass rates now count every required fixture sample, so missing values, non-finite observations, and adapter failures cannot overstate evaluation quality; the optional `featureEnabled` contract is also covered as a fail-closed, zero-execution default.
+  - Scorecards now copy and freeze metric thresholds, reject duplicate metric
+    expectations, and fail closed when a metric without a baseline uses
+    inconsistent per-fixture thresholds.
 
 - **Security**
-  - (placeholder)
+  - Raised transitive development-tool floors for `brace-expansion`,
+    `esbuild`, `nanoid`, and `postcss` to remediate current audit advisories.
 
 ## [1.0.0] - 2026-07-15
 

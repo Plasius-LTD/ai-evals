@@ -170,6 +170,10 @@ export interface AiEvalRunOptions<TInput = unknown> {
   readonly runId: string;
   readonly dataset: AiEvalGoldenDataset<TInput>;
   readonly adapter: AiEvalFixtureAdapter<TInput>;
+  /**
+   * Resolved host feature-flag decision. Omission fails closed and performs no
+   * fixture execution; scorecards never read process environment implicitly.
+   */
   readonly featureEnabled?: boolean;
 }
 
@@ -621,6 +625,27 @@ function assertMetricThreshold(threshold: AiEvalMetricThreshold, metricId: AiEva
   if (threshold.max !== undefined && !Number.isFinite(threshold.max)) {
     throw new Error(`Max threshold for metric "${metricId}" must be finite.`);
   }
+
+  if (
+    threshold.min !== undefined &&
+    threshold.max !== undefined &&
+    threshold.min > threshold.max
+  ) {
+    throw new Error(`Threshold for metric "${metricId}" has min greater than max.`);
+  }
+}
+
+function freezeMetricThreshold(
+  threshold: AiEvalMetricThreshold,
+): AiEvalMetricThreshold {
+  return Object.freeze({
+    ...(threshold.min === undefined ? {} : { min: threshold.min }),
+    ...(threshold.max === undefined ? {} : { max: threshold.max }),
+  });
+}
+
+function metricThresholdIdentity(threshold: AiEvalMetricThreshold): string {
+  return `${threshold.min ?? "none"}:${threshold.max ?? "none"}`;
 }
 
 function getMetricDefinition(metricId: AiEvalMetricId): AiEvalMetricDefinition {
@@ -700,6 +725,7 @@ function evaluateMetric(
 
 function aggregateMetricResults(
   evaluationsByFixture: readonly AiEvalMetricEvaluation[],
+  sampleCount: number,
   threshold: AiEvalMetricThreshold,
   direction: AiEvalMetricDirection,
   metricId: AiEvalMetricId
@@ -710,13 +736,13 @@ function aggregateMetricResults(
 
   const numericCount = metricValues.length;
   const passCount = evaluationsByFixture.filter((evaluation) => evaluation.passed).length;
-  const passRate = numericCount === 0 ? 0 : passCount / numericCount;
+  const passRate = sampleCount === 0 ? 0 : passCount / sampleCount;
 
   return Object.freeze({
     metricId,
     direction,
     observedCount: numericCount,
-    sampleCount: evaluationsByFixture.length,
+    sampleCount,
     passCount,
     average:
       numericCount === 0
@@ -754,12 +780,24 @@ export function defineAiEvalGoldenDataset<TInput = unknown>(
     throw new Error("Golden dataset must include at least one baseline expectation.");
   }
 
-  for (const expectation of dataset.baselineExpectations) {
+  const baselineMetricIds = new Set<AiEvalMetricId>();
+  const baselineExpectations = dataset.baselineExpectations.map((expectation) => {
     assertMetricThreshold(expectation.threshold, expectation.metricId);
     getMetricDefinition(expectation.metricId);
-  }
+    if (baselineMetricIds.has(expectation.metricId)) {
+      throw new Error(
+        `Duplicate baseline expectation for metric "${expectation.metricId}".`,
+      );
+    }
+    baselineMetricIds.add(expectation.metricId);
+    return Object.freeze({
+      metricId: expectation.metricId,
+      threshold: freezeMetricThreshold(expectation.threshold),
+    }) as AiEvalMetricExpectation;
+  });
 
   const fixtureIds = new Set<string>();
+  const overrideOnlyThresholds = new Map<AiEvalMetricId, string>();
   const fixtureCases = dataset.fixtureCases.map((fixtureCase) => {
     assertNonEmptyString(fixtureCase.fixtureId, "fixtureId");
 
@@ -769,25 +807,38 @@ export function defineAiEvalGoldenDataset<TInput = unknown>(
 
     fixtureIds.add(fixtureCase.fixtureId);
 
-    for (const expectation of fixtureCase.expectations ?? []) {
+    const fixtureMetricIds = new Set<AiEvalMetricId>();
+    const expectations = fixtureCase.expectations?.map((expectation) => {
       assertMetricThreshold(expectation.threshold, expectation.metricId);
       getMetricDefinition(expectation.metricId);
-    }
+      if (fixtureMetricIds.has(expectation.metricId)) {
+        throw new Error(
+          `Duplicate expectation for metric "${expectation.metricId}" in fixture "${fixtureCase.fixtureId}".`,
+        );
+      }
+      fixtureMetricIds.add(expectation.metricId);
+      const threshold = freezeMetricThreshold(expectation.threshold);
+      if (!baselineMetricIds.has(expectation.metricId)) {
+        const identity = metricThresholdIdentity(threshold);
+        const existing = overrideOnlyThresholds.get(expectation.metricId);
+        if (existing !== undefined && existing !== identity) {
+          throw new Error(
+            `Metric "${expectation.metricId}" has no baseline and uses inconsistent fixture thresholds.`,
+          );
+        }
+        overrideOnlyThresholds.set(expectation.metricId, identity);
+      }
+      return Object.freeze({
+        metricId: expectation.metricId,
+        threshold,
+      }) as AiEvalMetricExpectation;
+    });
 
     return Object.freeze({
       fixtureId: fixtureCase.fixtureId,
       input: fixtureCase.input,
       note: fixtureCase.note,
-      expectations: fixtureCase.expectations
-        ? freezeArray(
-            fixtureCase.expectations.map((expectation) =>
-              Object.freeze({
-                metricId: expectation.metricId,
-                threshold: expectation.threshold,
-              }) as AiEvalMetricExpectation
-            )
-          )
-        : undefined,
+      expectations: expectations ? freezeArray(expectations) : undefined,
       metadata: freezeRecord(fixtureCase.metadata),
     });
   });
@@ -797,9 +848,7 @@ export function defineAiEvalGoldenDataset<TInput = unknown>(
     version: dataset.version,
     name: dataset.name,
     taskType: dataset.taskType,
-    baselineExpectations: freezeArray(
-      dataset.baselineExpectations.map((expectation) => Object.freeze(expectation))
-    ),
+    baselineExpectations: freezeArray(baselineExpectations),
     fixtureCases: freezeArray(fixtureCases),
     notes: dataset.notes,
     metadata: freezeRecord(dataset.metadata),
@@ -1198,6 +1247,39 @@ export async function evaluateAiEvalScorecard<TInput = unknown>(
     });
   }
 
+  const aggregateInputs = new Map<
+    AiEvalMetricId,
+    {
+      evaluations: AiEvalMetricEvaluation[];
+      sampleCount: number;
+      threshold: AiEvalMetricThreshold;
+    }
+  >();
+
+  for (const fixtureCase of dataset.fixtureCases) {
+    const expectedByMetric = buildMetricExpectationMap(
+      dataset.baselineExpectations,
+      fixtureCase.expectations
+    );
+
+    for (const [metricId, expectation] of expectedByMetric) {
+      const existing = aggregateInputs.get(metricId);
+      if (existing) {
+        existing.sampleCount += 1;
+        continue;
+      }
+
+      aggregateInputs.set(metricId, {
+        evaluations: [],
+        sampleCount: 1,
+        threshold:
+          dataset.baselineExpectations.find(
+            (baselineExpectation) => baselineExpectation.metricId === metricId
+          )?.threshold ?? expectation.threshold,
+      });
+    }
+  }
+
   const fixtureResults: AiEvalFixtureResult[] = [];
 
   for (const fixtureCase of dataset.fixtureCases) {
@@ -1243,22 +1325,18 @@ export async function evaluateAiEvalScorecard<TInput = unknown>(
     }
   }
 
-  const metricsById = new Map<AiEvalMetricId, AiEvalMetricEvaluation[]>();
   for (const result of fixtureResults) {
     for (const evaluation of result.metrics) {
-      const values = metricsById.get(evaluation.metricId) ?? [];
-      values.push(evaluation);
-      metricsById.set(evaluation.metricId, values);
+      aggregateInputs.get(evaluation.metricId)?.evaluations.push(evaluation);
     }
   }
 
   const aggregate = freezeArray(
-    Array.from(metricsById.entries()).map(([metricId, evaluations]) =>
+    Array.from(aggregateInputs.entries()).map(([metricId, input]) =>
       aggregateMetricResults(
-        evaluations,
-        dataset.baselineExpectations.find(
-          (expectation) => expectation.metricId === metricId
-        )?.threshold ?? evaluations[0]!.threshold,
+        input.evaluations,
+        input.sampleCount,
+        input.threshold,
         getMetricDefinition(metricId).direction,
         metricId
       )
