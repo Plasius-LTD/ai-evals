@@ -10,6 +10,7 @@ import {
   AiEvalFixtureAdapter,
   AiEvalFixtureCase,
   AiEvalGoldenDataset,
+  AiEvalRunOptions,
   defineAiEvalGoldenDataset,
   evaluateAiEvalScorecard,
   evaluateQuietMeasureScorecard,
@@ -18,6 +19,7 @@ import {
   packageDescriptor,
   PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
   PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS,
+  QUIET_MEASURE_BASELINE_EXPECTATIONS,
   QUIET_MEASURE_FIXTURE_CASES,
   QUIET_MEASURE_GOLDEN_DATASET,
   evaluatePlayerSystemGovernanceScorecard,
@@ -57,7 +59,7 @@ describe("@plasius/ai-evals", () => {
         },
       };
 
-      const scorecard = await evaluateAiEvalScorecard({
+      const options: AiEvalRunOptions<{ prompt: string }> = Object.freeze({
         runId: "env-poisoned-disabled-default",
         dataset: defineAiEvalGoldenDataset({
           datasetId: "env-poisoned-dataset",
@@ -69,6 +71,7 @@ describe("@plasius/ai-evals", () => {
         }),
         adapter,
       });
+      const scorecard = await evaluateAiEvalScorecard(options);
 
       expect(scorecard.status).toBe("disabled");
       expect(scorecard.featureEnabled).toBe(false);
@@ -228,6 +231,317 @@ describe("@plasius/ai-evals", () => {
     expect(qualityAggregate?.passRate).toBe(1);
   });
 
+  it("counts every required metric sample when observations are missing, non-finite, or fail", async () => {
+    const fixtureCases = Object.freeze([
+      Object.freeze({ fixtureId: "complete", input: Object.freeze({ prompt: "complete" }) }),
+      Object.freeze({ fixtureId: "missing", input: Object.freeze({ prompt: "missing" }) }),
+      Object.freeze({ fixtureId: "nan", input: Object.freeze({ prompt: "nan" }) }),
+      Object.freeze({ fixtureId: "infinity", input: Object.freeze({ prompt: "infinity" }) }),
+      Object.freeze({ fixtureId: "adapter-error", input: Object.freeze({ prompt: "error" }) }),
+    ]);
+    const baselineExpectations = Object.freeze([
+      Object.freeze({
+        metricId: "quality" as const,
+        threshold: Object.freeze({ min: 0.8 }),
+      }),
+    ]);
+    const dataset: AiEvalGoldenDataset<{ readonly prompt: string }> = Object.freeze({
+      datasetId: "incomplete-quality-observations-v1",
+      version: "1.0.0",
+      name: "Incomplete quality observations",
+      taskType: "moderation",
+      baselineExpectations,
+      fixtureCases,
+    });
+    const adapter: AiEvalFixtureAdapter<{ readonly prompt: string }> = Object.freeze({
+      adapterId: "incomplete-observations",
+      tier: "development" as const,
+      async runFixture(fixture: AiEvalFixtureCase<{ readonly prompt: string }>) {
+        switch (fixture.fixtureId) {
+          case "complete":
+            return Object.freeze({
+              fixtureId: fixture.fixtureId,
+              metrics: Object.freeze([
+                Object.freeze({ metricId: "quality" as const, value: 0.9 }),
+              ]),
+            });
+          case "missing":
+            return Object.freeze({
+              fixtureId: fixture.fixtureId,
+              metrics: Object.freeze([]),
+            });
+          case "nan":
+            return Object.freeze({
+              fixtureId: fixture.fixtureId,
+              metrics: Object.freeze([
+                Object.freeze({ metricId: "quality" as const, value: Number.NaN }),
+              ]),
+            });
+          case "infinity":
+            return Object.freeze({
+              fixtureId: fixture.fixtureId,
+              metrics: Object.freeze([
+                Object.freeze({ metricId: "quality" as const, value: Number.POSITIVE_INFINITY }),
+              ]),
+            });
+          default:
+            throw new Error("adapter unavailable");
+        }
+      },
+    });
+    const options: AiEvalRunOptions<{ readonly prompt: string }> = Object.freeze({
+      runId: "incomplete-observations-run",
+      dataset,
+      adapter,
+      featureEnabled: true,
+    });
+
+    const scorecard = await evaluateAiEvalScorecard(options);
+
+    expect(scorecard.status).toBe("degraded");
+    expect(scorecard.fixtureCount).toBe(5);
+    expect(scorecard.executedFixtureCount).toBe(4);
+    expect(scorecard.passRate).toBe(0.2);
+    expect(scorecard.aggregate).toHaveLength(1);
+    expect(scorecard.aggregate[0]).toMatchObject({
+      metricId: "quality",
+      observedCount: 1,
+      sampleCount: 5,
+      passCount: 1,
+      average: 0.9,
+      min: 0.9,
+      max: 0.9,
+      passRate: 0.2,
+    });
+    expect(
+      scorecard.fixtureResults
+        .flatMap((fixture) => fixture.metrics)
+        .filter((metric) => metric.observed === null),
+    ).toHaveLength(3);
+    expect(scorecard.fixtureResults.at(-1)?.metrics).toEqual([]);
+    expect(Object.isFrozen(scorecard)).toBe(true);
+    expect(Object.isFrozen(scorecard.aggregate)).toBe(true);
+    expect(Object.isFrozen(scorecard.aggregate[0])).toBe(true);
+    expect(options.dataset).toBe(dataset);
+    expect(dataset.fixtureCases).toBe(fixtureCases);
+    expect(dataset.baselineExpectations).toBe(baselineExpectations);
+  });
+
+  it("copies and freezes thresholds so caller mutation cannot rewrite audit results", async () => {
+    const sourceThreshold = { min: 0.8 };
+    const dataset = {
+      datasetId: "threshold-aliasing-v1",
+      version: "1.0.0",
+      name: "Threshold aliasing",
+      taskType: "moderation" as const,
+      baselineExpectations: [
+        { metricId: "quality" as const, threshold: sourceThreshold },
+      ],
+      fixtureCases: [
+        { fixtureId: "quality-pass-1", input: { prompt: "pass" } },
+        { fixtureId: "quality-pass-2", input: { prompt: "pass" } },
+      ],
+    };
+    const adapter: AiEvalFixtureAdapter<{ readonly prompt: string }> = {
+      adapterId: "threshold-aliasing-adapter",
+      tier: "development",
+      async runFixture(fixture) {
+        return {
+          fixtureId: fixture.fixtureId,
+          metrics: [{ metricId: "quality", value: 0.9 }],
+        };
+      },
+    };
+
+    const scorecard = await evaluateAiEvalScorecard({
+      runId: "threshold-aliasing-run",
+      dataset,
+      adapter,
+      featureEnabled: true,
+    });
+
+    sourceThreshold.min = 0.1;
+
+    expect(scorecard.aggregate[0]?.threshold).toEqual({ min: 0.8 });
+    expect(scorecard.fixtureResults[0]?.metrics[0]?.threshold).toEqual({
+      min: 0.8,
+    });
+    expect(Object.isFrozen(scorecard.aggregate[0]?.threshold)).toBe(true);
+    expect(
+      Object.isFrozen(scorecard.fixtureResults[0]?.metrics[0]?.threshold),
+    ).toBe(true);
+    const auditThresholds = [
+      scorecard.aggregate[0]!.threshold,
+      ...scorecard.fixtureResults.map((fixture) => fixture.metrics[0]!.threshold),
+    ];
+    expect(auditThresholds.every((threshold) => threshold !== sourceThreshold)).toBe(true);
+    expect(auditThresholds.every((threshold) => Object.isFrozen(threshold))).toBe(true);
+    expect(new Set(auditThresholds).size).toBe(auditThresholds.length);
+  });
+
+  it("rejects heterogeneous override-only effective thresholds", () => {
+    const buildDataset = (reverse: boolean) => ({
+      datasetId: `override-only-thresholds-${reverse ? "reversed" : "forward"}`,
+      version: "1.0.0",
+      name: "Override-only thresholds",
+      taskType: "moderation" as const,
+      baselineExpectations: [
+        { metricId: "quality" as const, threshold: { min: 0.8 } },
+      ],
+      fixtureCases: (reverse
+        ? [
+            { fixtureId: "strict", threshold: 0.9 },
+            { fixtureId: "lenient", threshold: 0.7 },
+          ]
+        : [
+            { fixtureId: "lenient", threshold: 0.7 },
+            { fixtureId: "strict", threshold: 0.9 },
+          ]
+      ).map(({ fixtureId, threshold }) => ({
+        fixtureId,
+        input: { prompt: fixtureId },
+        expectations: [
+          { metricId: "confidence" as const, threshold: { min: threshold } },
+        ],
+      })),
+    });
+
+    for (const reverse of [false, true]) {
+      expect(() => defineAiEvalGoldenDataset(buildDataset(reverse))).toThrow(
+        'Metric "confidence" uses heterogeneous effective thresholds and cannot be represented by one aggregate threshold.',
+      );
+    }
+  });
+
+  it("fails closed on heterogeneous effective thresholds regardless of fixture order", () => {
+    const buildDataset = (reverse: boolean) => ({
+      datasetId: `heterogeneous-effective-thresholds-${reverse ? "reversed" : "forward"}`,
+      version: "1.0.0",
+      name: "Heterogeneous effective thresholds",
+      taskType: "moderation" as const,
+      baselineExpectations: [
+        { metricId: "quality" as const, threshold: { min: 0.8 } },
+      ],
+      fixtureCases: (reverse
+        ? [
+            { fixtureId: "strict", threshold: 0.9 },
+            { fixtureId: "lenient", threshold: 0.7 },
+          ]
+        : [
+            { fixtureId: "lenient", threshold: 0.7 },
+            { fixtureId: "strict", threshold: 0.9 },
+          ]
+      ).map(({ fixtureId, threshold }) => ({
+        fixtureId,
+        input: { prompt: fixtureId },
+        expectations: [
+          { metricId: "quality" as const, threshold: { min: threshold } },
+        ],
+      })),
+    });
+
+    for (const reverse of [false, true]) {
+      expect(() => defineAiEvalGoldenDataset(buildDataset(reverse))).toThrow(
+        'Metric "quality" uses heterogeneous effective thresholds and cannot be represented by one aggregate threshold.',
+      );
+    }
+  });
+
+  it("reports one uniform effective override threshold independent of fixture order", async () => {
+    const adapter: AiEvalFixtureAdapter<{ readonly prompt: string }> = {
+      adapterId: "uniform-effective-threshold-adapter",
+      tier: "development",
+      async runFixture(fixture) {
+        return {
+          fixtureId: fixture.fixtureId,
+          metrics: [{ metricId: "quality", value: 0.95 }],
+        };
+      },
+    };
+
+    for (const reverse of [false, true]) {
+      const fixtures = [
+        { fixtureId: "fixture-a", input: { prompt: "a" } },
+        { fixtureId: "fixture-b", input: { prompt: "b" } },
+      ];
+      const scorecard = await evaluateAiEvalScorecard({
+        runId: `uniform-effective-threshold-${reverse ? "reversed" : "forward"}`,
+        dataset: {
+          datasetId: `uniform-effective-threshold-${reverse ? "reversed" : "forward"}`,
+          version: "1.0.0",
+          name: "Uniform effective threshold",
+          taskType: "moderation",
+          baselineExpectations: [
+            { metricId: "quality", threshold: { min: 0.8 } },
+          ],
+          fixtureCases: (reverse ? fixtures.toReversed() : fixtures).map((fixture) => ({
+            ...fixture,
+            expectations: [
+              { metricId: "quality" as const, threshold: { min: 0.9 } },
+            ],
+          })),
+        },
+        adapter,
+        featureEnabled: true,
+      });
+
+      expect(scorecard.aggregate[0]?.threshold).toEqual({ min: 0.9 });
+      expect(scorecard.aggregate[0]?.sampleCount).toBe(2);
+      expect(scorecard.aggregate[0]?.passRate).toBe(1);
+    }
+  });
+
+  it("rejects duplicate and internally inconsistent metric thresholds", () => {
+    const common = {
+      datasetId: "ambiguous-thresholds-v1",
+      version: "1.0.0",
+      name: "Ambiguous thresholds",
+      taskType: "moderation" as const,
+    };
+
+    expect(() =>
+      defineAiEvalGoldenDataset({
+        ...common,
+        baselineExpectations: [
+          { metricId: "quality", threshold: { min: 0.8 } },
+          { metricId: "quality", threshold: { min: 0.9 } },
+        ],
+        fixtureCases: [{ fixtureId: "duplicate-baseline", input: {} }],
+      }),
+    ).toThrow('Duplicate baseline expectation for metric "quality".');
+
+    expect(() =>
+      defineAiEvalGoldenDataset({
+        ...common,
+        baselineExpectations: [
+          { metricId: "quality", threshold: { min: 0.8 } },
+        ],
+        fixtureCases: [
+          {
+            fixtureId: "duplicate-override",
+            input: {},
+            expectations: [
+              { metricId: "confidence", threshold: { min: 0.7 } },
+              { metricId: "confidence", threshold: { min: 0.8 } },
+            ],
+          },
+        ],
+      }),
+    ).toThrow(
+      'Duplicate expectation for metric "confidence" in fixture "duplicate-override".',
+    );
+
+    expect(() =>
+      defineAiEvalGoldenDataset({
+        ...common,
+        baselineExpectations: [
+          { metricId: "quality", threshold: { min: 0.9, max: 0.8 } },
+        ],
+        fixtureCases: [{ fixtureId: "inverted-range", input: {} }],
+      }),
+    ).toThrow('Threshold for metric "quality" has min greater than max.');
+  });
+
   it("returns disabled scorecards and skips adapter invocation when feature flag is off", async () => {
     const dataset: AiEvalGoldenDataset<{ input: string }> = {
       datasetId: "routing-v1",
@@ -349,6 +663,12 @@ describe("@plasius/ai-evals", () => {
       "quiet-measure-classification-v1",
     );
     expect(QUIET_MEASURE_FIXTURE_CASES).toHaveLength(6);
+    expect(Object.isFrozen(QUIET_MEASURE_BASELINE_EXPECTATIONS)).toBe(true);
+    expect(
+      QUIET_MEASURE_BASELINE_EXPECTATIONS.every(
+        (expectation) => Object.isFrozen(expectation) && Object.isFrozen(expectation.threshold),
+      ),
+    ).toBe(true);
     expect(
       QUIET_MEASURE_FIXTURE_CASES.map((fixture) => fixture.metadata?.expectedArchetype),
     ).toEqual([
@@ -369,7 +689,7 @@ describe("@plasius/ai-evals", () => {
   });
 
   it("contains no legacy Isekai namespace in exported runtime rollout contracts", () => {
-    const rolloutContracts = [
+    const rolloutContracts: readonly unknown[] = [
       AI_EVALS_QUIET_MEASURE_FEATURE_FLAG_ID,
       PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
       ...Object.values(PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS).map(
@@ -379,10 +699,14 @@ describe("@plasius/ai-evals", () => {
 
     expect(rolloutContracts).not.toContain(undefined);
     expect(
-      rolloutContracts.every((value) => value?.startsWith("harmony.")),
+      rolloutContracts.every(
+        (value) => typeof value === "string" && value.startsWith("harmony."),
+      ),
     ).toBe(true);
     expect(
-      rolloutContracts.some((value) => value?.startsWith("isekai.")),
+      rolloutContracts.some(
+        (value) => typeof value === "string" && value.startsWith("isekai."),
+      ),
     ).toBe(false);
   });
 

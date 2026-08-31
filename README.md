@@ -84,11 +84,27 @@ const scorecard = await evaluateAiEvalScorecard({
 console.log(AI_EVALS_FEATURE_FLAG_ID, scorecard.status);
 ```
 
-Host applications must pass `featureEnabled` from their feature-flag service.
-When omitted, scorecard execution defaults disabled. The exported
+Host applications should pass `featureEnabled` from their feature-flag service.
+The option is intentionally optional so callers can omit it safely: omission
+and explicit `false` both fail closed with zero fixture execution. Scorecards
+never read `process.env` implicitly. The exported
 `AI_EVALS_SCORECARDS_ENABLED` env-name constants and `isAiEvalsScorecardsEnabled`
 helper are retained only for older local tooling and must not be used as a
 production rollout source of truth.
+
+Aggregate metric `sampleCount` and `passRate` cover every fixture that requires
+the metric. Missing values, `NaN`, infinities, and adapter failures therefore
+remain failed samples in the denominator instead of making a partial result
+look complete. `observedCount`, `average`, `min`, and `max` continue to describe
+only finite observations. Thresholds are copied and frozen into the normalized
+dataset and scorecard so later caller mutation cannot rewrite audit evidence.
+Each fixture metric evaluation and aggregate owns a separate frozen threshold
+copy. Duplicate metric expectations are rejected. Because the public aggregate
+contract contains one `threshold`, every fixture sample requiring that metric
+must resolve to the same effective threshold after overrides. A uniform
+override used by every applicable fixture becomes the reported aggregate
+threshold; any heterogeneous effective thresholds fail dataset definition with
+the same error regardless of fixture order.
 
 ## Quiet Measure Fixtures
 
@@ -233,11 +249,9 @@ Apache-2.0
 Production package publication runs only from `.github/workflows/cd.yml` on
 protected `main`. The job verifies that the prepared commit is still the
 current main commit and has an exact successful `ci.yml` push result before it
-mutates release state. Pull-request validation runs on isolated GitHub-hosted
-capacity, while exact-main push validation uses fixed self-hosted Linux runners
-without caller-controlled labels. npm publication runs on
-GitHub-hosted Node.js 24 with
-npm 11.5.1 or newer, uses the protected `production` environment and
+mutates release state. Reviewed validation runs on explicit GitHub-hosted
+capacity with package-manager caching disabled and rejects fork PR execution.
+npm publication runs on GitHub-hosted Node.js 24 with pinned npm 11.6.2, uses the protected `production` environment and
 short-lived npm OIDC with provenance, and has no long-lived npm write-token
 fallback. Rollback disables CD; it never rewrites published package history.
 <!-- END PLASIUS RELEASE INTEGRITY -->

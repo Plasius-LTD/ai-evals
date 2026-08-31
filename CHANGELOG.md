@@ -26,11 +26,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Restored exact-main npm publication on a GitHub-hosted runner through
     short-lived OIDC, with an enforced Node/npm runtime and no long-lived
     write-token fallback.
-  - Routed pull-request validation to isolated GitHub-hosted capacity while
-    retaining exact-main push validation on fixed self-hosted Linux runners.
+  - Routed reviewed validation to explicit GitHub-hosted capacity with
+    package-manager caching disabled and fork PR execution rejected.
   - (placeholder)
 
 - **Fixed**
+  - Declared `esbuild` directly so clean installs can resolve tsup's runtime build dependency under the audited override set.
   - (placeholder)
 
 - **Security**
@@ -45,10 +46,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - (placeholder)
 
 - **Fixed**
-  - (placeholder)
+  - Aggregate metric pass rates now count every required fixture sample, so missing values, non-finite observations, and adapter failures cannot overstate evaluation quality; the optional `featureEnabled` contract is also covered as a fail-closed, zero-execution default.
+  - Scorecards now copy and freeze metric thresholds, reject duplicate metric
+    expectations, report the uniform effective fixture threshold, and fail
+    closed on heterogeneous effective thresholds regardless of fixture order.
 
 - **Security**
-  - (placeholder)
+  - Raised transitive development-tool floors for `brace-expansion`,
+    `esbuild`, `nanoid`, and `postcss` to remediate current audit advisories.
 
 ## [1.0.0] - 2026-07-15
 
