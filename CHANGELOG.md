@@ -12,8 +12,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
   - Restored exact-main npm publication on a GitHub-hosted runner through
     short-lived OIDC, with an enforced Node/npm runtime and no long-lived
     write-token fallback.
-  - Moved public package CI to GitHub-hosted capacity so internal and external
-    branches cannot queue on or execute against company-managed runners.
+  - Routed pull-request validation to isolated GitHub-hosted capacity while
+    retaining exact-main push validation on fixed self-hosted Linux runners.
+  - (placeholder)
+
+- **Fixed**
+  - (placeholder)
+
+- **Security**
+  - (placeholder)
+
+## [1.0.1] - 2026-08-30
+
+- **Added**
+  - (placeholder)
+
+- **Changed**
   - (placeholder)
 
 - **Fixed**
@@ -168,3 +182,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 [0.1.10]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.10
 [0.1.11]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v0.1.11
 [1.0.0]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v1.0.0
+[1.0.1]: https://github.com/Plasius-LTD/ai-evals/releases/tag/v1.0.1
