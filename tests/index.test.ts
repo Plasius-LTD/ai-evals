@@ -19,6 +19,7 @@ import {
   packageDescriptor,
   PLAYER_SYSTEM_GOVERNANCE_FEATURE_FLAG_ID,
   PLAYER_SYSTEM_GOVERNANCE_GOLDEN_DATASETS,
+  QUIET_MEASURE_BASELINE_EXPECTATIONS,
   QUIET_MEASURE_FIXTURE_CASES,
   QUIET_MEASURE_GOLDEN_DATASET,
   evaluatePlayerSystemGovernanceScorecard,
@@ -336,7 +337,10 @@ describe("@plasius/ai-evals", () => {
       baselineExpectations: [
         { metricId: "quality" as const, threshold: sourceThreshold },
       ],
-      fixtureCases: [{ fixtureId: "quality-pass", input: { prompt: "pass" } }],
+      fixtureCases: [
+        { fixtureId: "quality-pass-1", input: { prompt: "pass" } },
+        { fixtureId: "quality-pass-2", input: { prompt: "pass" } },
+      ],
     };
     const adapter: AiEvalFixtureAdapter<{ readonly prompt: string }> = {
       adapterId: "threshold-aliasing-adapter",
@@ -366,9 +370,16 @@ describe("@plasius/ai-evals", () => {
     expect(
       Object.isFrozen(scorecard.fixtureResults[0]?.metrics[0]?.threshold),
     ).toBe(true);
+    const auditThresholds = [
+      scorecard.aggregate[0]!.threshold,
+      ...scorecard.fixtureResults.map((fixture) => fixture.metrics[0]!.threshold),
+    ];
+    expect(auditThresholds.every((threshold) => threshold !== sourceThreshold)).toBe(true);
+    expect(auditThresholds.every((threshold) => Object.isFrozen(threshold))).toBe(true);
+    expect(new Set(auditThresholds).size).toBe(auditThresholds.length);
   });
 
-  it("rejects heterogeneous thresholds for metrics without a baseline", () => {
+  it("rejects heterogeneous override-only effective thresholds", () => {
     const buildDataset = (reverse: boolean) => ({
       datasetId: `override-only-thresholds-${reverse ? "reversed" : "forward"}`,
       version: "1.0.0",
@@ -397,8 +408,86 @@ describe("@plasius/ai-evals", () => {
 
     for (const reverse of [false, true]) {
       expect(() => defineAiEvalGoldenDataset(buildDataset(reverse))).toThrow(
-        'Metric "confidence" has no baseline and uses inconsistent fixture thresholds.',
+        'Metric "confidence" uses heterogeneous effective thresholds and cannot be represented by one aggregate threshold.',
       );
+    }
+  });
+
+  it("fails closed on heterogeneous effective thresholds regardless of fixture order", () => {
+    const buildDataset = (reverse: boolean) => ({
+      datasetId: `heterogeneous-effective-thresholds-${reverse ? "reversed" : "forward"}`,
+      version: "1.0.0",
+      name: "Heterogeneous effective thresholds",
+      taskType: "moderation" as const,
+      baselineExpectations: [
+        { metricId: "quality" as const, threshold: { min: 0.8 } },
+      ],
+      fixtureCases: (reverse
+        ? [
+            { fixtureId: "strict", threshold: 0.9 },
+            { fixtureId: "lenient", threshold: 0.7 },
+          ]
+        : [
+            { fixtureId: "lenient", threshold: 0.7 },
+            { fixtureId: "strict", threshold: 0.9 },
+          ]
+      ).map(({ fixtureId, threshold }) => ({
+        fixtureId,
+        input: { prompt: fixtureId },
+        expectations: [
+          { metricId: "quality" as const, threshold: { min: threshold } },
+        ],
+      })),
+    });
+
+    for (const reverse of [false, true]) {
+      expect(() => defineAiEvalGoldenDataset(buildDataset(reverse))).toThrow(
+        'Metric "quality" uses heterogeneous effective thresholds and cannot be represented by one aggregate threshold.',
+      );
+    }
+  });
+
+  it("reports one uniform effective override threshold independent of fixture order", async () => {
+    const adapter: AiEvalFixtureAdapter<{ readonly prompt: string }> = {
+      adapterId: "uniform-effective-threshold-adapter",
+      tier: "development",
+      async runFixture(fixture) {
+        return {
+          fixtureId: fixture.fixtureId,
+          metrics: [{ metricId: "quality", value: 0.95 }],
+        };
+      },
+    };
+
+    for (const reverse of [false, true]) {
+      const fixtures = [
+        { fixtureId: "fixture-a", input: { prompt: "a" } },
+        { fixtureId: "fixture-b", input: { prompt: "b" } },
+      ];
+      const scorecard = await evaluateAiEvalScorecard({
+        runId: `uniform-effective-threshold-${reverse ? "reversed" : "forward"}`,
+        dataset: {
+          datasetId: `uniform-effective-threshold-${reverse ? "reversed" : "forward"}`,
+          version: "1.0.0",
+          name: "Uniform effective threshold",
+          taskType: "moderation",
+          baselineExpectations: [
+            { metricId: "quality", threshold: { min: 0.8 } },
+          ],
+          fixtureCases: (reverse ? fixtures.toReversed() : fixtures).map((fixture) => ({
+            ...fixture,
+            expectations: [
+              { metricId: "quality" as const, threshold: { min: 0.9 } },
+            ],
+          })),
+        },
+        adapter,
+        featureEnabled: true,
+      });
+
+      expect(scorecard.aggregate[0]?.threshold).toEqual({ min: 0.9 });
+      expect(scorecard.aggregate[0]?.sampleCount).toBe(2);
+      expect(scorecard.aggregate[0]?.passRate).toBe(1);
     }
   });
 
@@ -574,6 +663,12 @@ describe("@plasius/ai-evals", () => {
       "quiet-measure-classification-v1",
     );
     expect(QUIET_MEASURE_FIXTURE_CASES).toHaveLength(6);
+    expect(Object.isFrozen(QUIET_MEASURE_BASELINE_EXPECTATIONS)).toBe(true);
+    expect(
+      QUIET_MEASURE_BASELINE_EXPECTATIONS.every(
+        (expectation) => Object.isFrozen(expectation) && Object.isFrozen(expectation.threshold),
+      ),
+    ).toBe(true);
     expect(
       QUIET_MEASURE_FIXTURE_CASES.map((fixture) => fixture.metadata?.expectedArchetype),
     ).toEqual([

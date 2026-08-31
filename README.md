@@ -90,10 +90,13 @@ remain failed samples in the denominator instead of making a partial result
 look complete. `observedCount`, `average`, `min`, and `max` continue to describe
 only finite observations. Thresholds are copied and frozen into the normalized
 dataset and scorecard so later caller mutation cannot rewrite audit evidence.
-Duplicate metric expectations are rejected. A metric introduced only through
-fixture overrides must use one consistent threshold across those fixtures;
-otherwise no truthful single aggregate threshold exists and dataset definition
-fails closed.
+Each fixture metric evaluation and aggregate owns a separate frozen threshold
+copy. Duplicate metric expectations are rejected. Because the public aggregate
+contract contains one `threshold`, every fixture sample requiring that metric
+must resolve to the same effective threshold after overrides. A uniform
+override used by every applicable fixture becomes the reported aggregate
+threshold; any heterogeneous effective thresholds fail dataset definition with
+the same error regardless of fixture order.
 
 ## Quiet Measure Fixtures
 
