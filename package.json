@@ -62,7 +62,7 @@
   },
   "homepage": "https://github.com/Plasius-LTD/ai-evals#readme",
   "dependencies": {
-    "@plasius/ai-config": "^0.1.11"
+    "@plasius/ai-config": "^0.1.12"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
